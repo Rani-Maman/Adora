@@ -1,0 +1,47 @@
+# Secrets
+.env
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Data exports (never commit)
+*.json
+!scrape_config.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!manifest.json
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+cron.log
+
+# Local folders (keep out of git)
+Old Enviroment/
+Oracle/
+Images and Docs/
+archive/
+hld_text.txt

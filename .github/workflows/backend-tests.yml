@@ -1,0 +1,38 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**']
+  pull_request:
+    branches: [main]
+    paths: ['backend/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements*.txt
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt -r requirements-dev.txt
+      
+      - name: Run linting
+        run: |
+          cd backend
+          flake8 app/ --max-line-length=100 --ignore=E501
+      
+      - name: Run tests
+        run: |
+          cd backend
+          pytest --tb=short
