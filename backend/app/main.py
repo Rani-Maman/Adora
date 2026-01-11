@@ -1,6 +1,7 @@
 """
 FastAPI application entry point.
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -43,9 +44,4 @@ async def root():
 async def health():
     """Detailed health check."""
     logger.debug("Health check requested")
-    return {
-        "status": "healthy",
-        "version": __version__,
-        "service": "adora-api"
-    }
-
+    return {"status": "healthy", "version": __version__, "service": "adora-api"}

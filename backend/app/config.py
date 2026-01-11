@@ -2,32 +2,33 @@
 Application configuration using Pydantic Settings.
 All secrets are loaded from environment variables.
 """
+
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
+
     # Database
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "firecrawl"
     db_user: str
     db_password: str
-    
+
     # API Keys
     firecrawl_api_key: str
     groq_api_key: str | None = None
     gemini_api_key: str | None = None
-    
+
     # Email (optional)
     email_sender: str | None = None
     email_password: str | None = None
     email_recipient: str | None = None
     smtp_server: str = "smtp.gmail.com"
     smtp_port: int = 587
-    
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
