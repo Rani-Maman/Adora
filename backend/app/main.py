@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.logging_config import setup_logging, get_logger
+from app.api.whitelist import router as whitelist_router
 
 # Initialize logging
 setup_logging()
@@ -17,6 +18,9 @@ app = FastAPI(
     description="Dropship scam detection API for Israeli e-commerce",
     version=__version__,
 )
+
+# Include routers
+app.include_router(whitelist_router)
 
 # CORS for Chrome extension
 app.add_middleware(

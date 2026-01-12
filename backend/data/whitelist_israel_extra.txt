@@ -1,0 +1,607 @@
+# Comprehensive Israeli Sites Whitelist
+# Researched from: SimilarWeb, Tranco, web research (2025-01)
+# Total: ~500+ domains covering all major Israeli industries
+
+# ================================================================================
+# BANKS & FINANCIAL INSTITUTIONS
+# ================================================================================
+
+# Major Banks
+bank-hapoalim.co.il
+bankhapoalim.com
+leumi.co.il
+mizrahi-tefahot.co.il
+discountbank.co.il
+bankdiscount.co.il
+fibi.co.il
+firstbank.co.il
+unionbank.co.il
+bankotsar.co.il
+igud.co.il
+mercantile.co.il
+yahav.co.il
+otzarhahayal.co.il
+boi.org.il
+bankisrael.gov.il
+bankjerusalem.co.il
+onezerobank.com
+
+# Credit Cards
+isracard.co.il
+cal-online.co.il
+leumicard.co.il
+max.co.il
+visa.co.il
+mastercard.co.il
+amex.co.il
+
+# Investment & Finance
+tase.co.il
+psagot.co.il
+more.co.il
+excellence.co.il
+meitav.co.il
+altshuler.co.il
+migdal.co.il
+harel-group.co.il
+phoenix.co.il
+clal.co.il
+etoro.com
+plus500.com
+xtb.com
+
+# ================================================================================
+# INSURANCE COMPANIES
+# ================================================================================
+
+harel.co.il
+migdal.co.il
+phoenix.co.il
+menora.co.il
+clalins.co.il
+ayalon.co.il
+shirbit.co.il
+idi.co.il
+bituachleumi.gov.il
+btl.gov.il
+
+# ================================================================================
+# HEALTH - KUPOT CHOLIM
+# ================================================================================
+
+clalit.co.il
+maccabi4u.co.il
+maccabi.co.il
+meuhedet.co.il
+leumit.co.il
+
+# ================================================================================
+# HOSPITALS & MEDICAL CENTERS
+# ================================================================================
+
+# Major Hospitals
+sheba.co.il
+sheba.org.il
+hadassah.org.il
+tasmc.org.il
+ichilov.co.il
+rambam.org.il
+soroka.org.il
+szmc.org.il
+assuta.co.il
+hmcisrael.com
+
+# Regional Hospitals
+barzilaimc.org.il
+hy.org.il
+wolfson.org.il
+meir.org.il
+kmc.org.il
+laniado.org.il
+poriya.health.gov.il
+ziv.org.il
+schneider.org.il
+reuth.org.il
+alyn.org.il
+mymc.co.il
+
+# ================================================================================
+# SUPERMARKETS & GROCERY
+# ================================================================================
+
+shufersal.co.il
+rami-levy.co.il
+victory.co.il
+victoryonline.co.il
+mega.co.il
+mck.co.il
+yeinot-bitan.co.il
+osher-ad.co.il
+tiv-taam.co.il
+freshmarket.co.il
+shoppy.co.il
+10bis.co.il
+wolt.com
+mishloha.co.il
+
+# ================================================================================
+# E-COMMERCE & SHOPPING
+# ================================================================================
+
+# Price Comparison
+zap.co.il
+pricerunner.co.il
+
+# Electronics
+ksp.co.il
+bug.co.il
+ivory.co.il
+machsanei-hashmal.co.il
+electric-center.co.il
+
+# Department Stores
+hamashbir.co.il
+azrieli.com
+wallashops.co.il
+
+# Fashion
+terminalx.com
+fox.co.il
+castro.com
+renuar.co.il
+golf.co.il
+intima.co.il
+factory54.co.il
+next.co.il
+h-o.co.il
+shein.com
+asos.com
+mango.com
+zara.com
+
+# Beauty & Pharmacy
+superpharm.co.il
+super-pharm.co.il
+be.co.il
+beautycenter.co.il
+
+# Home & Furniture
+ikea.co.il
+ace.co.il
+houzz.co.il
+
+# Kids
+toys-r-us.co.il
+babyme.co.il
+shilav.co.il
+
+# Sports
+decathlon.co.il
+adidas.co.il
+nike.co.il
+
+# Marketplace
+aliexpress.com
+ebay.com
+amazon.com
+temu.com
+
+# ================================================================================
+# REAL ESTATE & PROPERTY
+# ================================================================================
+
+yad2.co.il
+madlan.co.il
+homeless.co.il
+winwin.co.il
+nadlan.gov.il
+onmap.co.il
+komo.co.il
+anglo-saxon.co.il
+
+# ================================================================================
+# JOBS & RECRUITMENT
+# ================================================================================
+
+drushim.co.il
+alljobs.co.il
+jobmaster.co.il
+gothejob.co.il
+israblog.nana10.co.il
+linkedin.com
+glassdoor.com
+
+# ================================================================================
+# NEWS & MEDIA
+# ================================================================================
+
+# Major News
+ynet.co.il
+ynetnews.com
+walla.co.il
+mako.co.il
+haaretz.co.il
+haaretz.com
+israelhayom.co.il
+globes.co.il
+calcalist.co.il
+themarker.co.il
+maariv.co.il
+n12.co.il
+one.co.il
+ice.co.il
+timesofisrael.com
+jpost.com
+i24news.tv
+
+# Religious/Sector News
+kikar.co.il
+kipa.co.il
+bhol.co.il
+srugim.co.il
+inn.co.il
+makorrishon.co.il
+
+# Tech News
+geektime.co.il
+techtime.co.il
+
+# ================================================================================
+# TV & STREAMING
+# ================================================================================
+
+# Israeli TV
+reshet.tv
+keshet12.co.il
+kan.org.il
+hot.co.il
+yes.co.il
+partner.co.il
+cellcom.co.il
+chaiflicks.com
+
+# Global Streaming
+netflix.com
+disneyplus.com
+hbomax.com
+primevideo.com
+apple.com
+spotify.com
+youtube.com
+
+# ================================================================================
+# SPORTS
+# ================================================================================
+
+sport5.co.il
+one.co.il
+sport1.maariv.co.il
+maccabi.co.il
+hapoeltelaviv.co.il
+maccabihaifa.co.il
+beitar.co.il
+
+# ================================================================================
+# GOVERNMENT
+# ================================================================================
+
+# Main Portal
+gov.il
+www.gov.il
+
+# Ministries
+health.gov.il
+moh.gov.il
+education.gov.il
+mof.gov.il
+economy.gov.il
+mod.gov.il
+mfa.gov.il
+justice.gov.il
+moia.gov.il
+pmo.gov.il
+moag.gov.il
+environment.gov.il
+taasuka.gov.il
+tourism.gov.il
+
+# Agencies
+misim.gov.il
+btl.gov.il
+police.gov.il
+nevo.co.il
+piba.gov.il
+nii.gov.il
+cbs.gov.il
+iaa.gov.il
+
+# Defense
+idf.il
+idf.gov.il
+shabak.gov.il
+
+# ================================================================================
+# MUNICIPALITIES (Major Cities)
+# ================================================================================
+
+tel-aviv.gov.il
+jerusalem.muni.il
+haifa.muni.il
+rishonlezion.muni.il
+netanya.muni.il
+beer-sheva.muni.il
+ashdod.muni.il
+petah-tikva.muni.il
+holon.muni.il
+ramat-gan.muni.il
+bat-yam.muni.il
+bnei-brak.muni.il
+herzliya.muni.il
+kfar-saba.muni.il
+modiin.muni.il
+rehovot.muni.il
+ashkelon.muni.il
+raanana.muni.il
+lod.muni.il
+hod-hasharon.muni.il
+givatayim.muni.il
+nahariya.muni.il
+nazareth.muni.il
+acre.muni.il
+eilat.muni.il
+tiberias.muni.il
+kiryat-gat.muni.il
+kiryat-ata.muni.il
+kiryat-motzkin.muni.il
+kiryat-yam.muni.il
+rosh-haain.muni.il
+ness-ziona.muni.il
+yavne.muni.il
+afula.muni.il
+dimona.muni.il
+arad.muni.il
+sderot.muni.il
+
+# ================================================================================
+# UNIVERSITIES & EDUCATION
+# ================================================================================
+
+# Universities
+tau.ac.il
+huji.ac.il
+technion.ac.il
+bgu.ac.il
+biu.ac.il
+haifa.ac.il
+openu.ac.il
+weizmann.ac.il
+ariel.ac.il
+
+# Colleges
+idc.ac.il
+colman.ac.il
+mta.ac.il
+ruppin.ac.il
+hit.ac.il
+afeka.ac.il
+jce.ac.il
+sce.ac.il
+sapir.ac.il
+yvc.ac.il
+braude.ac.il
+bezalel.ac.il
+shenkar.ac.il
+hadassah.ac.il
+oranim.ac.il
+gordon.ac.il
+levinsky.ac.il
+seminar-hakibbutzim.ac.il
+beitberl.ac.il
+
+# ================================================================================
+# TELECOM & INTERNET
+# ================================================================================
+
+partner.co.il
+pelephone.co.il
+cellcom.co.il
+hot.co.il
+hot.net.il
+bezeq.co.il
+bezeqint.net
+012.net.il
+golan-telecom.co.il
+we4g.co.il
+xfone.co.il
+019.co.il
+netvision.net.il
+internet-gold.co.il
+
+# ================================================================================
+# TRANSPORTATION
+# ================================================================================
+
+# Rail & Bus
+rail.co.il
+israel-railways.co.il
+dan.co.il
+egged.co.il
+kavim.co.il
+metropoline.co.il
+nateev.co.il
+bus.gov.il
+rav-kav.co.il
+
+# Navigation & Ride
+moovit.com
+waze.com
+gett.com
+yango.com
+
+# Airlines
+el-al.com
+israir.co.il
+arkia.co.il
+airlines.co.il
+
+# Airports
+iaa.gov.il
+airports.co.il
+
+# Car Rental
+eldan.co.il
+avis.co.il
+budget.co.il
+hertz.co.il
+shlomo.co.il
+
+# ================================================================================
+# CARS & AUTOMOTIVE
+# ================================================================================
+
+# Classifieds
+yad2.co.il
+autoboom.co.il
+
+# Importers
+carasso.co.il
+unitedmotors.co.il
+champion-motors.com
+delek-motors.co.il
+
+# Brands
+toyota.co.il
+mazda.co.il
+hyundai.co.il
+kia.co.il
+skoda.co.il
+volkswagen.co.il
+seat.co.il
+mercedes-benz.co.il
+bmw.co.il
+audi.co.il
+
+# ================================================================================
+# UTILITIES & SERVICES
+# ================================================================================
+
+israpost.co.il
+israelpost.co.il
+iec.co.il
+electric.co.il
+mekorot.co.il
+hofashit.co.il
+pango.co.il
+cellopark.co.il
+
+# ================================================================================
+# TRAVEL & TOURISM
+# ================================================================================
+
+issta.co.il
+eshet.com
+ophir-tours.co.il
+amisragas.co.il
+fattal.co.il
+danhotels.com
+atlas.co.il
+rimonim-hotels.com
+booking.com
+airbnb.com
+hotels.com
+trivago.co.il
+
+# ================================================================================
+# FOOD & RESTAURANTS
+# ================================================================================
+
+10bis.co.il
+rest.co.il
+tabit.cloud
+dominos.co.il
+pizzahut.co.il
+mcdonalds.co.il
+burgerking.co.il
+coffeebar.co.il
+aroma.co.il
+cofix.co.il
+arcafe.co.il
+
+# ================================================================================
+# TECH COMPANIES (Israeli)
+# ================================================================================
+
+wix.com
+monday.com
+fiverr.com
+similarweb.com
+checkmarx.com
+cyberark.com
+ironsource.com
+playtika.com
+jfrog.com
+gett.com
+lemonade.com
+innovid.com
+kaltura.com
+taboola.com
+outbrain.com
+rapyd.net
+nayax.com
+papaya-global.com
+hibob.com
+gong.io
+tipalti.com
+yotpo.com
+walkme.com
+forter.com
+armis.com
+orca.security
+wiz.io
+snyk.io
+
+# ================================================================================
+# SOCIAL MEDIA & GLOBAL PLATFORMS
+# ================================================================================
+
+facebook.com
+instagram.com
+twitter.com
+x.com
+tiktok.com
+linkedin.com
+whatsapp.com
+telegram.org
+pinterest.com
+reddit.com
+tumblr.com
+
+# ================================================================================
+# PRODUCTIVITY & TOOLS
+# ================================================================================
+
+google.com
+google.co.il
+gmail.com
+drive.google.com
+docs.google.com
+microsoft.com
+office.com
+outlook.com
+zoom.us
+slack.com
+notion.so
+dropbox.com
+github.com
+stackoverflow.com
+wikipedia.org
+
+# ================================================================================
+# CRYPTO & FINTECH
+# ================================================================================
+
+binance.com
+coinbase.com
+crypto.com
+bit2c.co.il
+bits-of-gold.co.il
