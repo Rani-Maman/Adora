@@ -2,23 +2,23 @@
   "scrapes": [
     {
       "keyword": "מבצע",
-      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%9E%D7%91%D7%A6%D7%A2&search_type=keyword_unordered"
+      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%9E%D7%91%D7%A6%D7%A2&search_type=keyword_unordered&sort_data[mode]=relevancy_monthly_grouped&sort_data[direction]=desc"
     },
     {
       "keyword": "מוגבל",
-      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%22%D7%9E%D7%95%D7%92%D7%91%D7%9C%22&search_type=keyword_exact_phrase"
+      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%22%D7%9E%D7%95%D7%92%D7%91%D7%9C%22&search_type=keyword_exact_phrase&sort_data[mode]=relevancy_monthly_grouped&sort_data[direction]=desc"
     },
     {
       "keyword": "הנחה",
-      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%94%D7%A0%D7%97%D7%94&search_type=keyword_unordered"
+      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%94%D7%A0%D7%97%D7%94&search_type=keyword_unordered&sort_data[mode]=relevancy_monthly_grouped&sort_data[direction]=desc"
     },
     {
       "keyword": "שעות",
-      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%A9%D7%A2%D7%95%D7%AA&search_type=keyword_unordered"
+      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%A9%D7%A2%D7%95%D7%AA&search_type=keyword_unordered&sort_data[mode]=relevancy_monthly_grouped&sort_data[direction]=desc"
     },
     {
       "keyword": "עכשיו",
-      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%A2%D7%9B%D7%A9%D7%99%D7%95&search_type=keyword_unordered"
+      "search_url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=IL&is_targeted_country=false&media_type=all&q=%D7%A2%D7%9B%D7%A9%D7%99%D7%95&search_type=keyword_unordered&sort_data[mode]=relevancy_monthly_grouped&sort_data[direction]=desc"
     }
   ]
 }
