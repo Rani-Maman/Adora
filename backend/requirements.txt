@@ -11,9 +11,13 @@ sqlalchemy>=2.0.25
 # Scraping
 firecrawl-py>=0.0.16
 httpx>=0.26.0
+playwright>=1.40.0
 
 # Utilities
 python-dotenv>=1.0.0
 
 # Email
 secure-smtplib>=0.1.1
+
+# AI/LLM
+google-genai>=1.0.0
