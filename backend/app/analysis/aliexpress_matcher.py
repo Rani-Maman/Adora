@@ -33,12 +33,12 @@ class AliExpressMatcher:
             logger.warning("GEMINI_API_KEY not set")
             return
         self._client = genai.Client(api_key=api_key)
-        logger.info(f"AliExpress matcher initialized")
+        logger.info("AliExpress matcher initialized")
 
     async def analyze_product(self, product_url: str) -> dict[str, Any]:
         """
         Analyze a product page and check if it exists on AliExpress at lower price.
-        
+
         Returns:
             {
                 "is_dropship": bool,
@@ -83,10 +83,11 @@ Return ONLY valid JSON:
                 model=self.model_name, contents=prompt
             )
             text = response.text.strip()
-            text = re.sub(r'^```\w*\n?|```$', '', text)
-            match = re.search(r'\{[\s\S]*\}', text)
+            text = re.sub(r"^```\w*\n?|```$", "", text)
+            match = re.search(r"\{[\s\S]*\}", text)
             if match:
                 import json
+
                 return json.loads(match.group())
         except Exception as e:
             logger.error(f"Product extraction failed: {e}")
@@ -94,13 +95,13 @@ Return ONLY valid JSON:
 
     async def _find_aliexpress_match(self, product_info: dict) -> dict[str, Any]:
         """Search AliExpress for a matching product and compare prices."""
-        
+
         product_name = product_info.get("product_name_english", "")
         keywords = product_info.get("description_keywords", [])
         israeli_price = product_info.get("price_ils", 0)
         image_desc = product_info.get("image_description", "")
 
-        search_query = f"{product_name} {' '.join(keywords[:3])}"
+        # search_query = f"{product_name} {' '.join(keywords[:3])}"
 
         prompt = f"""Search AliExpress for this product and find the best match:
 
@@ -136,16 +137,17 @@ Return ONLY valid JSON:
                 model=self.model_name, contents=prompt
             )
             text = response.text.strip()
-            text = re.sub(r'^```\w*\n?|```$', '', text)
-            match = re.search(r'\{[\s\S]*\}', text)
+            text = re.sub(r"^```\w*\n?|```$", "", text)
+            match = re.search(r"\{[\s\S]*\}", text)
             if match:
                 import json
+
                 result = json.loads(match.group())
                 result["israeli_price"] = f"₪{israeli_price}"
                 return result
         except Exception as e:
             logger.error(f"AliExpress search failed: {e}")
-        
+
         return self._error_result("Could not search AliExpress")
 
     def _error_result(self, reason: str) -> dict[str, Any]:
@@ -153,17 +155,17 @@ Return ONLY valid JSON:
             "is_dropship": False,
             "confidence": 0.0,
             "evidence": [reason],
-            "error": True
+            "error": True,
         }
 
 
 async def check_if_dropshipping(product_url: str) -> dict[str, Any]:
     """
     Convenience function to check if a product is being dropshipped.
-    
+
     Args:
         product_url: URL of the Israeli product page
-        
+
     Returns:
         Analysis result with dropshipping determination
     """

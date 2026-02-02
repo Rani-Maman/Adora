@@ -45,7 +45,7 @@ class GeminiScorer(BaseScorer):
         # Step 1: Scrape
         logger.info(f"Scraping {url}")
         site_data = await self._scraper.scrape(url)
-        
+
         if site_data.error:
             logger.error(f"Scrape error: {site_data.error}")
             return self._empty_result(f"Scrape error: {site_data.error}")
@@ -62,14 +62,14 @@ class GeminiScorer(BaseScorer):
             "product": site_data.product_name,
             "price": site_data.product_price,
             "phone": site_data.phone,
-            "business_id": site_data.business_id
+            "business_id": site_data.business_id,
         }
 
         return analysis
 
     async def _analyze_with_gemini(self, site: SiteData) -> dict[str, Any]:
         """Use Gemini to analyze the scraped data."""
-        
+
         prompt = (
             f"You are an Israeli e-commerce fraud detector. DISTINGUISH LEGIT VS DROPSHIP.\n\n"
             f"Dropshippers = Sell generic viral gadgets (blankets, posture, lamps) at 4x markup.\n"
@@ -88,24 +88,24 @@ class GeminiScorer(BaseScorer):
             f"{site.page_text[:1200]}...\n\n"
             f"ANALYSIS RULES:\n"
             f"1. **DIGITAL PRODUCTS**: If it's a COURSE, WORKSHOP, EBOOK, or SERVICE "
-            f"(e.g. \"Real Estate\", \"Math Course\") -> **SCORE 0.0 (LEGIT)**. "
+            f'(e.g. "Real Estate", "Math Course") -> **SCORE 0.0 (LEGIT)**. '
             f"Do not flag landing pages for courses as dropshipping.\n"
-            f"2. **PRODUCT CHECK**: Is \"{site.product_name}\" a viral dropship gadget? "
+            f'2. **PRODUCT CHECK**: Is "{site.product_name}" a viral dropship gadget? '
             f"Or a specialized/branded item?\n"
             f"3. **SHIPPING TRUTH**: If they sell generic junk with no address + "
-            f"\"1-5 day shipping\", they are likely lying.\n\n"
+            f'"1-5 day shipping", they are likely lying.\n\n'
             f"SCORING GUIDE:\n"
             f"- 0.0-0.2: Legit (Brands, Niche, **Courses**, **Services**)\n"
             f"- 0.3-0.5: Uncertain / Mixed signals\n"
             f"- 0.6-1.0: Dropship (Generic Gadget + Fake Scarcity + No Identity)\n\n"
             f"Return ONLY valid JSON:\n"
             f"{{\n"
-            f"    \"score\": 0.0-1.0,\n"
-            f"    \"is_risky\": true/false,\n"
-            f"    \"category\": \"legit|uncertain|dropship\",\n"
-            f"    \"reason\": \"1-sentence explanation\",\n"
-            f"    \"evidence\": [\"list\", \"of\", \"factors\"],\n"
-            f"    \"confidence\": 0.0-1.0\n"
+            f'    "score": 0.0-1.0,\n'
+            f'    "is_risky": true/false,\n'
+            f'    "category": "legit|uncertain|dropship",\n'
+            f'    "reason": "1-sentence explanation",\n'
+            f'    "evidence": ["list", "of", "factors"],\n'
+            f'    "confidence": 0.0-1.0\n'
             f"}}"
         )
 
@@ -124,36 +124,49 @@ class GeminiScorer(BaseScorer):
         """Fallback rule-based analysis."""
         score = 0.0
         reasons = []
-        
-        if site.has_countdown_timer: score += 0.2; reasons.append("Countdown timer")
-        if site.has_scarcity_widget: score += 0.2; reasons.append("Scarcity widget")
-        if site.has_whatsapp_only: score += 0.15; reasons.append("WhatsApp only")
-        if not site.business_id: score += 0.15; reasons.append("No business ID")
-            
+
+        if site.has_countdown_timer:
+            score += 0.2
+            reasons.append("Countdown timer")
+        if site.has_scarcity_widget:
+            score += 0.2
+            reasons.append("Scarcity widget")
+        if site.has_whatsapp_only:
+            score += 0.15
+            reasons.append("WhatsApp only")
+        if not site.business_id:
+            score += 0.15
+            reasons.append("No business ID")
+
         return {
             "score": min(1.0, score),
             "is_risky": score > 0.5,
             "category": "uncertain",
             "evidence": reasons,
-            "scorer": f"{self.get_name()}_fallback"
+            "scorer": f"{self.get_name()}_fallback",
         }
 
     def _parse_json(self, text: str) -> dict:
         import json
         import re
-        clean = re.sub(r'^```\w*\n?|```$', '', text.strip())
-        match = re.search(r'\{[\s\S]*\}', clean)
+
+        clean = re.sub(r"^```\w*\n?|```$", "", text.strip())
+        match = re.search(r"\{[\s\S]*\}", clean)
         if match:
             try:
                 return json.loads(match.group())
-            except:
+            except Exception:
                 pass
         return {}
 
     def _empty_result(self, reason: str) -> dict[str, Any]:
         return {
-            "score": 0.0, "is_risky": False, "category": "unknown",
-            "evidence": [reason], "confidence": 0.0, "scorer": self.get_name()
+            "score": 0.0,
+            "is_risky": False,
+            "category": "unknown",
+            "evidence": [reason],
+            "confidence": 0.0,
+            "scorer": self.get_name(),
         }
 
     def get_name(self) -> str:

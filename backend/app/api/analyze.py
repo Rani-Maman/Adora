@@ -4,7 +4,7 @@ Exposes dropship detection scorer.
 """
 
 from typing import Any, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 
 from app.analysis.gemini_scorer import analyze_url
@@ -42,7 +42,7 @@ async def analyze_site(request: AnalyzeRequest):
     try:
         # Call the scorer
         result = await analyze_url(url_str)
-        
+
         # Format response
         return AnalyzeResponse(
             url=url_str,
@@ -52,7 +52,7 @@ async def analyze_site(request: AnalyzeRequest):
             reason=result.get("reason"),
             evidence=result.get("evidence", []),
             scraped_data=result.get("scraped_data_summary"),
-            scorer=result.get("scorer", "unknown")
+            scorer=result.get("scorer", "unknown"),
         )
 
     except Exception as e:
