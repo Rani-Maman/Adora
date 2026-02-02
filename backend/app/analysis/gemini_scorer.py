@@ -70,43 +70,44 @@ class GeminiScorer(BaseScorer):
     async def _analyze_with_gemini(self, site: SiteData) -> dict[str, Any]:
         """Use Gemini to analyze the scraped data."""
         
-        prompt = f"""You are an Israeli e-commerce fraud detector. DISTINGUISH LEGIT VS DROPSHIP.
-
-Dropshippers = Sell generic viral gadgets (blankets, posture, lamps) at 4x markup.
-Legit Business = Known brands, Niche stores, Handmade, OR **Services/Courses**.
-
-SCRAPED DATA:
-URL: {site.url}
-Title: {site.title}
-Product Name: {site.product_name}
-Price: {site.product_price}
-Shipping Claim: {site.shipping_time}
-Business ID (ח.פ.): {site.business_id}
-Phone: {site.phone}
-Signals: Countdown={site.has_countdown_timer}, Scarcity={site.has_scarcity_widget}, WhatsAppOnly={site.has_whatsapp_only}
-
-Raw Text Sample:
-{site.page_text[:1200]}...
-
-ANALYSIS RULES:
-1. **DIGITAL PRODUCTS**: If it's a COURSE, WORKSHOP, EBOOK, or SERVICE (e.g. "Real Estate", "Math Course") → **SCORE 0.0 (LEGIT)**. Do not flag landing pages for courses as dropshipping.
-2. **PRODUCT CHECK**: Is "{site.product_name}" a viral dropship gadget? Or a specialized/branded item?
-3. **SHIPPING TRUTH**: If they sell generic junk with no address + "1-5 day shipping", they are likely lying.
-
-SCORING GUIDE:
-- 0.0-0.2: Legit (Brands, Niche, **Courses**, **Services**)
-- 0.3-0.5: Uncertain / Mixed signals
-- 0.6-1.0: Dropship (Generic Gadget + Fake Scarcity + No Identity)
-
-Return ONLY valid JSON:
-{{
-    "score": 0.0-1.0,
-    "is_risky": true/false,
-    "category": "legit|uncertain|dropship",
-    "reason": "1-sentence explanation",
-    "evidence": ["list", "of", "factors"],
-    "confidence": 0.0-1.0
-}}"""
+        prompt = (
+            f"You are an Israeli e-commerce fraud detector. DISTINGUISH LEGIT VS DROPSHIP.\n\n"
+            f"Dropshippers = Sell generic viral gadgets (blankets, posture, lamps) at 4x markup.\n"
+            f"Legit Business = Known brands, Niche stores, Handmade, OR **Services/Courses**.\n\n"
+            f"SCRAPED DATA:\n"
+            f"URL: {site.url}\n"
+            f"Title: {site.title}\n"
+            f"Product Name: {site.product_name}\n"
+            f"Price: {site.product_price}\n"
+            f"Shipping Claim: {site.shipping_time}\n"
+            f"Business ID (ח.פ.): {site.business_id}\n"
+            f"Phone: {site.phone}\n"
+            f"Signals: Countdown={site.has_countdown_timer}, "
+            f"Scarcity={site.has_scarcity_widget}, WhatsAppOnly={site.has_whatsapp_only}\n\n"
+            f"Raw Text Sample:\n"
+            f"{site.page_text[:1200]}...\n\n"
+            f"ANALYSIS RULES:\n"
+            f"1. **DIGITAL PRODUCTS**: If it's a COURSE, WORKSHOP, EBOOK, or SERVICE "
+            f"(e.g. \"Real Estate\", \"Math Course\") -> **SCORE 0.0 (LEGIT)**. "
+            f"Do not flag landing pages for courses as dropshipping.\n"
+            f"2. **PRODUCT CHECK**: Is \"{site.product_name}\" a viral dropship gadget? "
+            f"Or a specialized/branded item?\n"
+            f"3. **SHIPPING TRUTH**: If they sell generic junk with no address + "
+            f"\"1-5 day shipping\", they are likely lying.\n\n"
+            f"SCORING GUIDE:\n"
+            f"- 0.0-0.2: Legit (Brands, Niche, **Courses**, **Services**)\n"
+            f"- 0.3-0.5: Uncertain / Mixed signals\n"
+            f"- 0.6-1.0: Dropship (Generic Gadget + Fake Scarcity + No Identity)\n\n"
+            f"Return ONLY valid JSON:\n"
+            f"{{\n"
+            f"    \"score\": 0.0-1.0,\n"
+            f"    \"is_risky\": true/false,\n"
+            f"    \"category\": \"legit|uncertain|dropship\",\n"
+            f"    \"reason\": \"1-sentence explanation\",\n"
+            f"    \"evidence\": [\"list\", \"of\", \"factors\"],\n"
+            f"    \"confidence\": 0.0-1.0\n"
+            f"}}"
+        )
 
         try:
             response = await self._client.aio.models.generate_content(

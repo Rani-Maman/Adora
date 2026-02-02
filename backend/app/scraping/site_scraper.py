@@ -92,7 +92,11 @@ class SiteScraper:
                 
                 # Signals
                 data.has_countdown_timer = bool(await page.query_selector("[class*='countdown'], [class*='timer']"))
-                data.has_scarcity_widget = bool(re.search(r'רק\s+\d+\s+(?:נותר|נשאר)|only\s+\d+\s+left', data.page_text, re.I))
+                data.has_scarcity_widget = bool(re.search(
+                    r'רק\s+\d+\s+(?:נותר|נשאר)|only\s+\d+\s+left', 
+                    data.page_text, 
+                    re.I
+                ))
                 
                 has_whatsapp = "whatsapp" in data.page_text.lower() or "wa.me" in data.page_text.lower()
                 data.has_whatsapp_only = has_whatsapp and not data.phone and not data.email
