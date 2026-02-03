@@ -34,7 +34,7 @@ if not GEMINI_KEY:
     logger.error("GEMINI_API_KEY not found in environment!")
     # Allow running for testing/scraping even if key missing, but scorer will fail
 
-BATCH_SIZE = 30
+BATCH_SIZE = 10
 
 # --- Scraper & Scorer (Same as before) ---
 @dataclass
@@ -101,7 +101,6 @@ class GeminiScorer:
         if not self.client:
              return {"score": 0.0, "reason": "No API Key", "is_risky": False}
 
-        prompt = f"""You are an Israeli e-commerce fraud detector. DISTINGUISH LEGIT VS DROPSHIP.
         prompt = f"""You are an Israeli e-commerce fraud detector. DISTINGUISH LEGIT VS DROPSHIP.
 Rules: Digital/Courses=0.0 (Legit), Viral Gadgets=0.8 (Dropship), Context=Critical.
 

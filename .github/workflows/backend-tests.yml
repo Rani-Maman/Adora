@@ -31,7 +31,7 @@ jobs:
       - name: Run linting
         run: |
           cd backend
-          flake8 app/ --max-line-length=100 --ignore=E501
+          flake8 app/ --max-line-length=100 --ignore=E501,W503
       
       - name: Run tests
         run: |
