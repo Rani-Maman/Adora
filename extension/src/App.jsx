@@ -28,11 +28,8 @@ function App() {
       }
 
       try {
-        const response = await fetch(`${API_BASE}/analyze/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        })
+        // Call /check endpoint (lightweight DB lookup)
+        const response = await fetch(`${API_BASE}/check/?url=${encodeURIComponent(url)}`)
 
         if (!response.ok) throw new Error('API Error')
 
@@ -47,7 +44,7 @@ function App() {
   }, [])
 
   // Only show content for risky sites
-  const isRisky = result && result.score >= RISK_THRESHOLD
+  const isRisky = result && result.risky && result.score >= RISK_THRESHOLD
 
   return (
     <div className="popup">

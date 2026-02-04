@@ -2,37 +2,37 @@
 // Detects when user visits a site and triggers analysis
 
 (function () {
-    // Only run once per page load
-    if (window.__adoraChecked) return;
-    window.__adoraChecked = true;
+  // Only run once per page load
+  if (window.__adoraChecked) return;
+  window.__adoraChecked = true;
 
-    // Skip non-http pages
-    if (!location.href.startsWith('http')) return;
+  // Skip non-http pages
+  if (!location.href.startsWith('http')) return;
 
-    // Skip known safe domains
-    const safeDomains = [
-        'google.com', 'facebook.com', 'youtube.com', 'twitter.com',
-        'linkedin.com', 'github.com', 'microsoft.com', 'apple.com'
-    ];
+  // Skip known safe domains
+  const safeDomains = [
+    'google.com', 'facebook.com', 'youtube.com', 'twitter.com',
+    'linkedin.com', 'github.com', 'microsoft.com', 'apple.com'
+  ];
 
-    const currentDomain = location.hostname.replace('www.', '');
-    if (safeDomains.some(d => currentDomain.includes(d))) return;
+  const currentDomain = location.hostname.replace('www.', '');
+  if (safeDomains.some(d => currentDomain.includes(d))) return;
 
-    // Send URL to background for analysis
-    chrome.runtime.sendMessage({
-        type: 'CHECK_URL',
-        url: location.href
-    }, (response) => {
-        if (response && response.is_risky && response.score >= 0.6) {
-            showWarningBanner(response);
-        }
-    });
+  // Send URL to background for check
+  chrome.runtime.sendMessage({
+    type: 'CHECK_URL',
+    url: location.href
+  }, (response) => {
+    if (response && response.risky && response.score >= 0.6) {
+      showWarningBanner(response);
+    }
+  });
 
-    // Show warning banner for risky sites
-    function showWarningBanner(result) {
-        const banner = document.createElement('div');
-        banner.id = 'adora-warning-banner';
-        banner.innerHTML = `
+  // Show warning banner for risky sites
+  function showWarningBanner(result) {
+    const banner = document.createElement('div');
+    banner.id = 'adora-warning-banner';
+    banner.innerHTML = `
       <div style="
         position: fixed;
         top: 0;
@@ -76,14 +76,14 @@
       </div>
     `;
 
-        document.body.insertBefore(banner, document.body.firstChild);
+    document.body.insertBefore(banner, document.body.firstChild);
 
-        // Handle dismiss
-        document.getElementById('adora-close-btn').addEventListener('click', () => {
-            banner.remove();
-        });
+    // Handle dismiss
+    document.getElementById('adora-close-btn').addEventListener('click', () => {
+      banner.remove();
+    });
 
-        // Add padding to body so content isn't hidden
-        document.body.style.marginTop = '80px';
-    }
+    // Add padding to body so content isn't hidden
+    document.body.style.marginTop = '80px';
+  }
 })();

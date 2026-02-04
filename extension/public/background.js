@@ -29,12 +29,8 @@ async function checkUrl(url, tabId) {
             return cached;
         }
 
-        // Call API
-        const response = await fetch(`${API_BASE}/analyze/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: url })
-        });
+        // Call /check endpoint (lightweight DB lookup)
+        const response = await fetch(`${API_BASE}/check/?url=${encodeURIComponent(url)}`);
 
         if (!response.ok) {
             console.error('API error:', response.status);
@@ -60,8 +56,8 @@ async function checkUrl(url, tabId) {
 function updateBadge(tabId, result) {
     if (!result) return;
 
-    // Only show badge for risky sites (score >= 0.6)
-    if (result.score >= RISK_THRESHOLD) {
+    // Only show badge for risky sites
+    if (result.risky && result.score >= RISK_THRESHOLD) {
         chrome.action.setBadgeText({ tabId, text: '!' });
         chrome.action.setBadgeBackgroundColor({ tabId, color: '#DC2626' }); // Red
     } else {

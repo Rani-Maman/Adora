@@ -9,6 +9,7 @@ from app import __version__
 from app.logging_config import setup_logging, get_logger
 from app.api.whitelist import router as whitelist_router
 from app.api.analyze import router as analyze_router
+from app.api.check import router as check_router
 
 # Initialize logging
 setup_logging()
@@ -23,6 +24,7 @@ app = FastAPI(
 # Include routers
 app.include_router(whitelist_router)
 app.include_router(analyze_router)
+app.include_router(check_router)
 
 # CORS for Chrome extension
 app.add_middleware(
