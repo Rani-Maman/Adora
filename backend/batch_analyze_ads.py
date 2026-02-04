@@ -34,7 +34,7 @@ if not GEMINI_KEY:
     logger.error("GEMINI_API_KEY not found in environment!")
     # Allow running for testing/scraping even if key missing, but scorer will fail
 
-BATCH_SIZE = 10
+BATCH_SIZE = 15
 
 # --- Scraper & Scorer (Same as before) ---
 @dataclass
