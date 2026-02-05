@@ -10,10 +10,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    # Database
-    db_host: str = "localhost"
+    # Database (required)
+    db_host: str
     db_port: int = 5432
-    db_name: str = "firecrawl"
+    db_name: str
     db_user: str
     db_password: str
 

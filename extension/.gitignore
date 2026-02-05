@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Config with API URL (generated from .env)
+public/config.js
+.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

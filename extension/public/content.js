@@ -9,14 +9,7 @@
   // Skip non-http pages
   if (!location.href.startsWith('http')) return;
 
-  // Skip known safe domains
-  const safeDomains = [
-    'google.com', 'facebook.com', 'youtube.com', 'twitter.com',
-    'linkedin.com', 'github.com', 'microsoft.com', 'apple.com'
-  ];
-
-  const currentDomain = location.hostname.replace('www.', '');
-  if (safeDomains.some(d => currentDomain.includes(d))) return;
+  // Safe domain check is done in background.js using 22k+ domains from whitelist files
 
   // Send URL to background for check
   chrome.runtime.sendMessage({

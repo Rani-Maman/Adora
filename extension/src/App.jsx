@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE
+if (!API_BASE) {
+  console.error('VITE_API_BASE not set in environment')
+}
 const RISK_THRESHOLD = 0.6
 
 function App() {
