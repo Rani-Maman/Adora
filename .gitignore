@@ -39,6 +39,7 @@ Thumbs.db
 # Logs
 *.log
 cron.log
+logs/
 
 # Local folders (keep out of git)
 Old Enviroment/

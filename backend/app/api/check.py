@@ -7,9 +7,12 @@ from fastapi import APIRouter, Query
 from typing import Optional
 import os
 import psycopg2
+import time
 from urllib.parse import urlparse
+from app.logging_config import get_logger
 
 router = APIRouter(prefix="/check", tags=["check"])
+logger = get_logger("check")
 
 
 def get_db_connection():
@@ -53,9 +56,11 @@ async def check_url(url: str = Query(..., description="URL to check")):
     domain = extract_domain(url)
     
     if not domain:
+        logger.warning(f"Invalid URL provided: {url}")
         return {"risky": False, "domain": "", "error": "Invalid URL"}
     
     try:
+        start_time = time.time()
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -71,10 +76,20 @@ async def check_url(url: str = Query(..., description="URL to check")):
         )
         
         result = cursor.fetchone()
+        query_time = time.time() - start_time
         cursor.close()
         conn.close()
         
         if result:
+            logger.info(
+                f"Domain lookup: RISKY",
+                extra={
+                    "domain": domain,
+                    "risk_score": float(result[1]) if result[1] else 0.0,
+                    "query_time_ms": round(query_time * 1000, 2),
+                    "found": True,
+                }
+            )
             return {
                 "risky": True,
                 "domain": result[0],
@@ -84,8 +99,21 @@ async def check_url(url: str = Query(..., description="URL to check")):
                 "first_seen": str(result[4]) if result[4] else None,
             }
         
+        logger.info(
+            f"Domain lookup: SAFE",
+            extra={
+                "domain": domain,
+                "query_time_ms": round(query_time * 1000, 2),
+                "found": False,
+            }
+        )
         return {"risky": False, "domain": domain}
         
     except Exception as e:
+        logger.error(
+            f"Database error checking domain: {domain}",
+            extra={"domain": domain, "error": str(e)},
+            exc_info=True
+        )
         # On error, default to not risky (fail open)
         return {"risky": False, "domain": domain, "error": str(e)}

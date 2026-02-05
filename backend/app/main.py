@@ -2,7 +2,8 @@
 FastAPI application entry point.
 """
 
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
@@ -11,8 +12,8 @@ from app.api.whitelist import router as whitelist_router
 from app.api.analyze import router as analyze_router
 from app.api.check import router as check_router
 
-# Initialize logging
-setup_logging()
+# Initialize logging with file output and JSON format
+setup_logging(log_file="logs/api.log", json_logs=True)
 logger = get_logger("api")
 
 app = FastAPI(
@@ -20,6 +21,59 @@ app = FastAPI(
     description="Dropship scam detection API for Israeli e-commerce",
     version=__version__,
 )
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests and their response times."""
+    start_time = time.time()
+    
+    # Get client IP
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Log request
+    logger.info(
+        f"Request started",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "query": str(request.url.query) if request.url.query else None,
+            "client_ip": client_ip,
+            "user_agent": request.headers.get("user-agent", "unknown"),
+        }
+    )
+    
+    # Process request
+    try:
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        
+        # Log response
+        logger.info(
+            f"Request completed",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": round(process_time * 1000, 2),
+                "client_ip": client_ip,
+            }
+        )
+        
+        return response
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(
+            f"Request failed: {str(e)}",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "duration_ms": round(process_time * 1000, 2),
+                "client_ip": client_ip,
+            },
+            exc_info=True
+        )
+        raise
 
 # Include routers
 app.include_router(whitelist_router)
