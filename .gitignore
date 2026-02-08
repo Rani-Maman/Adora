@@ -62,5 +62,15 @@ query_db.py
 scp_out*.txt
 ssh_*.txt
 vm_check.txt
+vm_check*.txt
+vm_db.txt
+vm_cron.txt
+vm_script_check.py
+verify_check.txt
+test_output.txt
+riskdb.txt
+db_out.txt
+db_count*.txt
 test_write.txt
 terminal_test.txt
+vm_query.sh

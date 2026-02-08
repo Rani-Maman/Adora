@@ -1,0 +1,15 @@
+[Unit]
+Description=Adora REST API
+After=network.target postgresql.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Adora/backend
+Environment="PATH=/home/ubuntu/Adora/backend/venv/bin"
+EnvironmentFile=/home/ubuntu/Adora/backend/.env
+ExecStart=/home/ubuntu/Adora/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
