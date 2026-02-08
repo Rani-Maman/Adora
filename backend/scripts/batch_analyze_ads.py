@@ -288,7 +288,14 @@ async def main():
             site = await scraper.scrape(url)
             if site.error:
                 logger.warning(f"Scrape Error: {site.error[:100]}")
-                # Leave analysis_score as NULL to retry in future batches
+                # Mark as analyzed with score=-1 to indicate scrape failure
+                update_ad_result(ad_id, {
+                    'score': -1,
+                    'category': 'scrape_error',
+                    'reason': site.error[:200],
+                    'is_risky': False,
+                    'evidence': []
+                })
                 continue
                 
             res = await scorer.score(site)

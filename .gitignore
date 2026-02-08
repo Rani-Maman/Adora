@@ -46,4 +46,21 @@ Old Enviroment/
 Oracle/
 Images and Docs/
 archive/
+sandbox/
+tmp/
 hld_text.txt
+PROJECT_INFO.md
+
+# Script runtime output
+backend/scripts/output/
+backend/scripts/configs/
+
+# One-off debug/deploy scripts
+deploy_*.py
+deploy_*.txt
+query_db.py
+scp_out*.txt
+ssh_*.txt
+vm_check.txt
+test_write.txt
+terminal_test.txt

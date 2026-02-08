@@ -152,7 +152,7 @@ async function checkUrl(url, tabId) {
         const startTime = performance.now();
         
         log('INFO', `API call: ${domain}`, { source: 'api' });
-        const response = await fetch(`${API_BASE}/check/?url=${encodeURIComponent(url)}`);
+        const response = await fetch(`${getApiBase()}/check/?url=${encodeURIComponent(url)}`);
 
         if (!response.ok) {
             log('ERROR', `API error for ${domain}`, { status: response.status });

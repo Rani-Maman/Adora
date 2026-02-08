@@ -31,9 +31,13 @@ def get_stats():
     today = datetime.date.today()
     yesterday = today - datetime.timedelta(days=1)
 
-    # Total Analyzed Yesterday
-    sql_total = f"SELECT COUNT(*) FROM ads_with_urls WHERE analyzed_at >= '{yesterday} 00:00:00' AND analyzed_at < '{today} 00:00:00';"
+    # Total Analyzed Yesterday (excluding scrape errors with score=-1)
+    sql_total = f"SELECT COUNT(*) FROM ads_with_urls WHERE analyzed_at >= '{yesterday} 00:00:00' AND analyzed_at < '{today} 00:00:00' AND analysis_score >= 0;"
     total = int(run_psql(sql_total).stdout.strip() or 0)
+
+    # Scrape Errors (score=-1)
+    sql_errors = f"SELECT COUNT(*) FROM ads_with_urls WHERE analyzed_at >= '{yesterday} 00:00:00' AND analyzed_at < '{today} 00:00:00' AND analysis_score = -1;"
+    errors = int(run_psql(sql_errors).stdout.strip() or 0)
 
     # Risky Ads (Score >= 0.5)
     sql_risky = f"SELECT COUNT(*) FROM ads_with_urls WHERE analyzed_at >= '{yesterday} 00:00:00' AND analyzed_at < '{today} 00:00:00' AND analysis_score >= 0.5;"
@@ -52,6 +56,7 @@ def get_stats():
     return {
         "date": str(yesterday),
         "total": total,
+        "errors": errors,
         "risky": risky,
         "safe": safe,
         "upserted": upserted,
@@ -98,6 +103,7 @@ ADORA DAILY FILTERING REPORT: {stats['date']}
 Ads Tested:       {stats['total']}
 Risky Found:      {stats['risky']} ({pct:.1f}%)
 Safe Cleared:     {stats['safe']}
+Scrape Errors:    {stats['errors']}
 Copied to RiskDB: {stats['upserted']}
 Remaining Backlog:{stats['pending']}
 =========================================

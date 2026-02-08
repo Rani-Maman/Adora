@@ -107,3 +107,19 @@ async def health():
     """Detailed health check."""
     logger.debug("Health check requested")
     return {"status": "healthy", "version": __version__, "service": "adora-api"}
+
+
+@app.get("/tunnel-url")
+async def get_tunnel_url():
+    """Get current Cloudflare tunnel URL (auto-updated by cron)."""
+    try:
+        # Read from file written by update-tunnel-url.sh
+        with open("/tmp/tunnel-url.txt", "r") as f:
+            url = f.read().strip()
+        return {"url": url, "status": "ok"}
+    except FileNotFoundError:
+        return {"url": None, "status": "not_found", "message": "Tunnel URL not yet detected"}
+    except Exception as e:
+        logger.error(f"Error reading tunnel URL: {e}")
+        return {"url": None, "status": "error", "message": str(e)}
+

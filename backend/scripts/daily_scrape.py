@@ -12,6 +12,7 @@ from typing import List
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import psycopg2
+from urllib.parse import urlparse
 
 # Remove current directory from sys.path
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -46,6 +47,55 @@ yesterday = today - timedelta(days=1)
 day_before_yesterday = today - timedelta(days=2)
 date_start = day_before_yesterday.strftime("%b %d, %Y")
 date_end = yesterday.strftime("%b %d, %Y")
+
+# Common valid TLDs
+VALID_TLDS = {
+    '.com', '.org', '.net', '.edu', '.gov', '.co', '.io', '.ai', '.app',
+    '.co.il', '.com.au', '.co.uk', '.ca', '.de', '.fr', '.jp', '.cn',
+    '.ru', '.br', '.in', '.mx', '.es', '.it', '.nl', '.se', '.no', '.dk',
+    '.info', '.biz', '.me', '.tv', '.shop', '.store', '.online', '.site'
+}
+
+def is_valid_url(url: str) -> bool:
+    """Validate URL has proper structure and known TLD."""
+    if not url or not url.strip():
+        return False
+    
+    url = url.strip()
+    
+    try:
+        parsed = urlparse(url)
+        
+        # Must have scheme (http/https)
+        if not parsed.scheme or parsed.scheme not in ['http', 'https']:
+            return False
+        
+        # Must have netloc (domain)
+        if not parsed.netloc:
+            return False
+        
+        # Check for valid TLD
+        netloc_lower = parsed.netloc.lower()
+        
+        # Remove port if present
+        if ':' in netloc_lower:
+            netloc_lower = netloc_lower.split(':')[0]
+        
+        # Check if ends with a known TLD
+        has_valid_tld = any(netloc_lower.endswith(tld) for tld in VALID_TLDS)
+        
+        # Additional check: must have at least one dot in domain
+        if '.' not in netloc_lower:
+            return False
+        
+        # Reject if domain is just TLD (e.g., "co.il")
+        if netloc_lower in VALID_TLDS or netloc_lower.startswith('.'):
+            return False
+        
+        return has_valid_tld
+        
+    except Exception:
+        return False
 
 # Database connection function
 def get_db_connection():
@@ -225,8 +275,10 @@ for idx, scrape_config in enumerate(config['scrapes'], 1):
                     url = ad.get("destination_product_url", "")
                     if url and url.strip():  # Not null or empty
                         url_lower = url.lower()
-                        # Filter out unwanted URLs
-                        if not any(x in url_lower for x in ["fb.me", "instagram", "whatsapp"]):
+                        # Filter out unwanted URLs and validate structure
+                        is_blacklisted = any(x in url_lower for x in ["fb.me", "instagram", "whatsapp"])
+                        
+                        if not is_blacklisted and is_valid_url(url):
                             cursor.execute("""
                                 INSERT INTO ads_with_urls (advertiser_name, ad_start_date, ad_library_link, ad_text, destination_product_url)
                                 VALUES (%s, %s, %s, %s, %s)
@@ -242,6 +294,8 @@ for idx, scrape_config in enumerate(config['scrapes'], 1):
                                 url_inserted += 1
                             else:
                                 url_skipped += 1
+                        else:
+                            url_skipped += 1
                                 
                 except Exception as e:
                     error_msg = f"{ad.get('advertiser_name')}: {str(e)}"
