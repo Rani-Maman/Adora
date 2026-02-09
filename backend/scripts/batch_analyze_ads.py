@@ -11,6 +11,7 @@ import json
 import logging
 import subprocess
 import random
+import fcntl
 from datetime import datetime
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -39,6 +40,7 @@ BATCH_SIZE = 10  # Reduced for 956MB RAM VM
 GEMINI_RETRY_ATTEMPTS = 3
 GEMINI_BASE_DELAY = 2  # seconds
 GEMINI_CALL_DELAY = 2  # seconds between API calls - reduces rate to ~3 calls/min
+LOCK_FILE = "/tmp/batch_analyze.lock"  # Prevent concurrent cron runs
 
 # --- URL Skip Patterns (unscrape-able or low-value URLs) ---
 SKIP_URL_PATTERNS = [
@@ -350,4 +352,20 @@ async def main():
     logger.info("Done.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Use lock file to prevent concurrent cron runs
+    try:
+        lock_fd = os.open(LOCK_FILE, os.O_CREAT | os.O_RDWR)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        logger.warning("Another instance is already running. Exiting.")
+        exit(0)
+    
+    try:
+        asyncio.run(main())
+    finally:
+        # Release lock
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
+        except:
+            pass
