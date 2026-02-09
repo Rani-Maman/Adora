@@ -35,10 +35,36 @@ if not GEMINI_KEY:
     logger.error("GEMINI_API_KEY not found in environment!")
     # Allow running for testing/scraping even if key missing, but scorer will fail
 
-BATCH_SIZE = 20  # Increased - completes in ~6 min, within 10 min cron window
+BATCH_SIZE = 10  # Reduced for 956MB RAM VM
 GEMINI_RETRY_ATTEMPTS = 3
 GEMINI_BASE_DELAY = 2  # seconds
 GEMINI_CALL_DELAY = 2  # seconds between API calls - reduces rate to ~3 calls/min
+
+# --- URL Skip Patterns (unscrape-able or low-value URLs) ---
+SKIP_URL_PATTERNS = [
+    r'^https?://(?:www\.)?facebook\.com/',     # Facebook login wall
+    r'^https?://(?:www\.)?fb\.com/',
+    r'^https?://(?:www\.)?instagram\.com/',    # Instagram login wall
+    r'^https?://wa\.me/',                       # WhatsApp direct links
+    r'^https?://api\.whatsapp\.com/',
+    r'^https?://chat\.whatsapp\.com/',
+    r'^https?://docs\.google\.com/',            # Google Docs/Forms
+    r'^https?://drive\.google\.com/',
+    r'^https?://forms\.google\.com/',
+    r'^https?://linktr\.ee/',                   # Linktree (just links)
+    r'^https?://(?:www\.)?tiktok\.com/',       # TikTok login wall
+    r'^https?://(?:www\.)?youtube\.com/',      # YouTube (video platform)
+    r'^https?://(?:www\.)?youtu\.be/',
+]
+
+def should_skip_url(url: str) -> bool:
+    """Return True if URL is known to be unscrape-able or low-value."""
+    if not url or len(url) < 15:
+        return True
+    for pattern in SKIP_URL_PATTERNS:
+        if re.match(pattern, url, re.I):
+            return True
+    return False
 
 # --- Scraper & Scorer (Same as before) ---
 @dataclass
@@ -223,7 +249,21 @@ def run_psql(sql):
     return subprocess.run(cmd, capture_output=True, text=True)
 
 def fetch_unscored_ads(limit=10):
-    sql = f"SELECT id, destination_product_url FROM ads_with_urls WHERE analysis_score IS NULL AND destination_product_url IS NOT NULL LIMIT {limit};"
+    sql = f"""SELECT id, destination_product_url FROM ads_with_urls 
+    WHERE analysis_score IS NULL 
+      AND destination_product_url IS NOT NULL
+      AND destination_product_url NOT LIKE '%facebook.com%'
+      AND destination_product_url NOT LIKE '%instagram.com%'
+      AND destination_product_url NOT LIKE '%fb.com%'
+      AND destination_product_url NOT LIKE '%wa.me%'
+      AND destination_product_url NOT LIKE '%whatsapp.com%'
+      AND destination_product_url NOT LIKE '%tiktok.com%'
+      AND destination_product_url NOT LIKE '%youtube.com%'
+      AND destination_product_url NOT LIKE '%youtu.be%'
+      AND destination_product_url NOT LIKE '%linktr.ee%'
+      AND destination_product_url NOT LIKE '%docs.google.com%'
+      AND LENGTH(destination_product_url) > 15
+    LIMIT {limit};"""
     res = run_psql(sql)
     ads = []
     if res.stdout.strip():

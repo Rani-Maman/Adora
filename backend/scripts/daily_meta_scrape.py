@@ -53,6 +53,7 @@ import meta_ads_http_scraper as meta_scraper
 LOG = logging.getLogger("daily_meta_scrape")
 DEFAULT_TIMEZONE = "Asia/Jerusalem"
 SOCIAL_HOST_SUFFIXES = (
+    # Social media with login walls
     "facebook.com",
     "fb.com",
     "fb.me",
@@ -61,6 +62,18 @@ SOCIAL_HOST_SUFFIXES = (
     "whatsapp.com",
     "wa.me",
     "m.me",
+    # Video platforms (login/heavy JS)
+    "tiktok.com",
+    "youtube.com",
+    "youtu.be",
+    # Link aggregators (low analysis value)
+    "linktr.ee",
+    "linkin.bio",
+    # Google services
+    "docs.google.com",
+    "drive.google.com",
+    "forms.google.com",
+    "sheets.google.com",
 )
 SOCIAL_PATH_MARKERS = (
     "/messages",
