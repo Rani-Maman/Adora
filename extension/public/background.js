@@ -9,6 +9,7 @@ if (!self.ADORA_CONFIG?.API_BASE) {
 }
 
 const API_BASE = self.ADORA_CONFIG?.API_BASE;
+const API_KEY = self.ADORA_CONFIG?.API_KEY;
 const RISK_THRESHOLD = self.ADORA_CONFIG?.RISK_THRESHOLD || 0.6;
 const SAFE_DOMAINS = self.ADORA_CONFIG?.SAFE_DOMAINS || new Set();
 
@@ -152,7 +153,9 @@ async function checkUrl(url, tabId) {
         const startTime = performance.now();
         
         log('INFO', `API call: ${domain}`, { source: 'api' });
-        const response = await fetch(`${getApiBase()}/check/?url=${encodeURIComponent(url)}`);
+        const response = await fetch(`${API_BASE}/check/?url=${encodeURIComponent(url)}`, {
+            headers: API_KEY ? { 'X-API-Key': API_KEY } : {}
+        });
 
         if (!response.ok) {
             log('ERROR', `API error for ${domain}`, { status: response.status });
