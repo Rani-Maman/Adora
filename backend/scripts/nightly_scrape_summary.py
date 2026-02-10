@@ -229,42 +229,49 @@ def parse_runtime(stats):
 def build_keyword_lines(db_stats, json_reports):
     """Build per-keyword report lines with emoji checkmarks.
 
-    Uses JSON report data when available for richer stats (runtime, duplicates).
+    Uses JSON report data (with db_results) for accurate new/duplicate counts.
     Falls back to DB-only data otherwise.
     """
     keyword_ads = db_stats.get("keyword_ads", {})
 
-    # Try to merge JSON report data per keyword
+    # Extract per-keyword data from JSON reports (each report = one keyword job)
     json_kw_data = {}
     for report in json_reports:
         summary = report.get("summary", {})
         runtime = summary.get("runtime_seconds", 0)
         link_results = summary.get("link_results", [])
-        rows_by_kw = summary.get("rows_selected_by_keyword", {})
+        db_results = summary.get("db", {})
 
         for lr in link_results:
             kw = lr.get("keyword", "")
             if not kw:
                 continue
-            captured = lr.get("ads_captured", 0)
-            selected = lr.get("selected_rows", rows_by_kw.get(kw, 0))
+            selected = lr.get("selected_rows", 0)
             json_kw_data[kw] = {
-                "captured": captured,
                 "selected": selected,
                 "runtime_seconds": runtime,
                 "timed_out": lr.get("timed_out", False),
+                # Real new counts from DB operations
+                "advertisers_inserted": db_results.get("advertisers_inserted", 0),
+                "ads_with_urls_inserted": db_results.get("ads_with_urls_inserted", 0),
             }
 
     lines = []
+    total_new = 0
+    total_dupes = 0
     all_keywords = sorted(set(list(keyword_ads.keys()) + list(json_kw_data.keys())))
 
     for kw in all_keywords:
         display = KEYWORD_DISPLAY.get(kw, kw)
-        db_count = keyword_ads.get(kw, 0)
         jd = json_kw_data.get(kw, {})
-        captured = jd.get("captured", db_count)
-        selected = jd.get("selected", db_count)
+        selected = jd.get("selected", keyword_ads.get(kw, 0))
         runtime_sec = jd.get("runtime_seconds", 0)
+
+        # New = advertisers_inserted from db_results (real new count)
+        new = jd.get("advertisers_inserted", 0)
+        dupes = max(0, selected - new)
+        total_new += new
+        total_dupes += dupes
 
         # Format runtime
         if runtime_sec > 0:
@@ -274,15 +281,11 @@ def build_keyword_lines(db_stats, json_reports):
         else:
             rt_str = ""
 
-        # New vs duplicates (based on DB insert count vs selected)
-        new = db_count
-        dupes = max(0, selected - new)
-
-        status = "✅🟢" if db_count > 0 else "⚠️🔴"
-        line = f"{status} {selected} - {display} ads, {new} new, {dupes} duplicates {rt_str}"
+        status = "✅" if selected > 0 else "⚠️"
+        line = f"{status} {display} - {selected} ads, {new} new, {dupes} duplicates {rt_str}"
         lines.append(line.strip())
 
-    return lines
+    return lines, total_new, total_dupes
 
 
 def build_report(db_stats, json_reports):
@@ -293,7 +296,13 @@ def build_report(db_stats, json_reports):
     start_time, end_time, duration = parse_runtime(db_stats)
 
     total_ads = db_stats.get("total_ads_today", 0)
-    new_advertisers = db_stats.get("new_advertisers", 0)
+
+    # Get per-keyword lines with accurate new/dup totals
+    kw_lines, total_new, total_dupes = build_keyword_lines(db_stats, json_reports)
+
+    # Use per-keyword totals for new advertisers if available,
+    # otherwise fall back to DB-level count
+    new_advertisers = total_new if total_new > 0 else db_stats.get("new_advertisers", 0)
     duplicates = max(0, total_ads - new_advertisers)
 
     lines = []
@@ -308,15 +317,14 @@ def build_report(db_stats, json_reports):
     lines.append("")
     lines.append("By Keyword:")
 
-    kw_lines = build_keyword_lines(db_stats, json_reports)
     for kl in kw_lines:
         lines.append(kl)
 
     lines.append("")
-    lines.append("📁 Database:")
+    lines.append("💾 Database:")
     lines.append(
         f"- All Advertisers: ~{db_stats['total_advertisers']} total "
-        f"(added {db_stats['new_advertisers']} today)"
+        f"(added {new_advertisers} today)"
     )
     lines.append(
         f"- Ads with Valid URLs: {db_stats['total_ads_with_urls']} total "
