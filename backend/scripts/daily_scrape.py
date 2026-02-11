@@ -282,7 +282,7 @@ for idx, scrape_config in enumerate(config['scrapes'], 1):
                             cursor.execute("""
                                 INSERT INTO ads_with_urls (advertiser_name, ad_start_date, ad_library_link, ad_text, destination_product_url)
                                 VALUES (%s, %s, %s, %s, %s)
-                                ON CONFLICT (advertiser_name) DO NOTHING;
+                                ON CONFLICT DO NOTHING;
                             """, (
                                 ad.get("advertiser_name"),
                                 ad.get("ad_start_date"),

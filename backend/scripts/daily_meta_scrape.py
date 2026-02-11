@@ -631,7 +631,7 @@ def insert_rows(conn: psycopg2.extensions.connection, rows: list[dict[str, Any]]
                 """
                 INSERT INTO ads_with_urls (advertiser_name, ad_start_date, ad_library_link, ad_text, destination_product_url)
                 VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (advertiser_name) DO NOTHING;
+                ON CONFLICT DO NOTHING;
                 """,
                 (
                     row["advertiser_name"],

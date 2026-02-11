@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     gemini_api_key: str | None = None
 
+    # Extension API key (for authenticating Chrome extension requests)
+    adora_api_key: str | None = None
+
     # Email (optional)
     email_sender: str | None = None
     email_password: str | None = None

@@ -50,6 +50,7 @@ sandbox/
 tmp/
 hld_text.txt
 PROJECT_INFO.md
+CLAUDE.md
 
 # Script runtime output
 backend/scripts/output/

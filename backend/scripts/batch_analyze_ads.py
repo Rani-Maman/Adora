@@ -42,6 +42,26 @@ GEMINI_BASE_DELAY = 2  # seconds
 GEMINI_CALL_DELAY = 2  # seconds between API calls - reduces rate to ~3 calls/min
 LOCK_FILE = "/tmp/batch_analyze.lock"  # Prevent concurrent cron runs
 
+# --- Whitelist (known legit domains — skip analysis entirely) ---
+def _load_whitelist() -> set:
+    base = os.path.join(os.path.dirname(__file__), '..', 'data')
+    # Also check adora_ops/data (VM path)
+    vm_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+    domains = set()
+    for directory in [base, vm_base]:
+        for fname in ['whitelist_global.txt', 'whitelist_israel.txt', 'whitelist_israel_extra.txt']:
+            path = os.path.join(directory, fname)
+            if os.path.exists(path):
+                with open(path) as f:
+                    for line in f:
+                        d = line.strip().lower()
+                        if d and not d.startswith('#'):
+                            domains.add(d)
+    logger.info(f"Loaded {len(domains)} whitelist domains")
+    return domains
+
+WHITELIST_DOMAINS = _load_whitelist()
+
 # --- URL Skip Patterns (unscrape-able or low-value URLs) ---
 SKIP_URL_PATTERNS = [
     r'^https?://(?:www\.)?facebook\.com/',     # Facebook login wall
@@ -57,15 +77,29 @@ SKIP_URL_PATTERNS = [
     r'^https?://(?:www\.)?tiktok\.com/',       # TikTok login wall
     r'^https?://(?:www\.)?youtube\.com/',      # YouTube (video platform)
     r'^https?://(?:www\.)?youtu\.be/',
+    r'^https?://temu\.to/',                    # Temu affiliate redirects (hangs Playwright)
 ]
 
 def should_skip_url(url: str) -> bool:
-    """Return True if URL is known to be unscrape-able or low-value."""
+    """Return True if URL is known to be unscrape-able, low-value, or whitelisted."""
     if not url or len(url) < 15:
         return True
     for pattern in SKIP_URL_PATTERNS:
         if re.match(pattern, url, re.I):
             return True
+    # Skip whitelisted domains (known legit — no analysis needed)
+    try:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc.lower().removeprefix('www.')
+        if domain in WHITELIST_DOMAINS:
+            return True
+        # Check parent domain (e.g. shop.example.com → example.com)
+        parts = domain.split('.')
+        for i in range(1, len(parts) - 1):
+            if '.'.join(parts[i:]) in WHITELIST_DOMAINS:
+                return True
+    except Exception:
+        pass
     return False
 
 # --- Scraper & Scorer (Same as before) ---
@@ -161,9 +195,20 @@ class SiteScraper:
             try:
                 await page.goto(url, wait_until="domcontentloaded", timeout=40000)
                 await page.wait_for_timeout(3000)
-                
-                data.title = await page.title()
-                body = await page.inner_text("body")
+                # Wait for any post-load redirects to settle
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=5000)
+                except Exception:
+                    pass
+
+                try:
+                    data.title = await page.title()
+                    body = await page.inner_text("body")
+                except Exception:
+                    # Context destroyed mid-redirect — re-grab current page state
+                    await page.wait_for_timeout(2000)
+                    data.title = await page.title()
+                    body = await page.inner_text("body")
                 data.page_text = body[:4000]
 
                 h1 = await page.query_selector("h1")
@@ -181,6 +226,35 @@ class SiteScraper:
                 data.has_countdown_timer = bool(await page.query_selector("[class*='countdown'], [class*='timer']"))
                 data.has_scarcity_widget = bool(re.search(r'רק\s+\d+\s+(?:נותר|נשאר)|only\s+\d+\s+left', body, re.I))
                 data.has_whatsapp_only = ("whatsapp" in body.lower() or "wa.me" in body.lower()) and not data.phone
+
+                # Extract price
+                m_price = re.search(r'[₪$]\s*(\d[\d,\.]+)|(\d[\d,\.]+)\s*[₪$]', body)
+                if m_price:
+                    raw = (m_price.group(1) or m_price.group(2)).replace(',', '')
+                    try: data.product_price = float(raw)
+                    except ValueError: pass
+
+                # If no price found (listicle/landing page), follow first /products/ link
+                if not data.product_price:
+                    product_links = await page.eval_on_selector_all(
+                        'a[href*="/products/"]',
+                        'els => els.map(e => e.href)'
+                    )
+                    if product_links:
+                        try:
+                            prod_page = await context.new_page()
+                            await prod_page.goto(product_links[0], wait_until="domcontentloaded", timeout=20000)
+                            prod_body = await prod_page.inner_text("body")
+                            await prod_page.close()
+                            # Append product page text and re-extract price
+                            data.page_text += "\n[PRODUCT PAGE]\n" + prod_body[:1000]
+                            m_price2 = re.search(r'[₪$]\s*(\d[\d,\.]+)|(\d[\d,\.]+)\s*[₪$]', prod_body)
+                            if m_price2:
+                                raw = (m_price2.group(1) or m_price2.group(2)).replace(',', '')
+                                try: data.product_price = float(raw)
+                                except ValueError: pass
+                        except Exception:
+                            pass
             finally:
                 await page.close()
         except Exception as e:
@@ -205,17 +279,37 @@ class GeminiScorer:
         if not self.client:
              return {"score": 0.0, "reason": "No API Key", "is_risky": False}
 
-        prompt = f"""You are an Israeli e-commerce fraud detector. DISTINGUISH LEGIT VS DROPSHIP.
-Rules: Digital/Courses=0.0 (Legit), Viral Gadgets=0.8 (Dropship), Context=Critical.
+        prompt = f"""You are an Israeli e-commerce fraud detector. Identify DROPSHIP/SCAM stores vs legitimate businesses.
+
+STRONG DROPSHIP SIGNALS (each adds 0.2-0.3):
+- Reviews shown as WhatsApp/Messenger/chat screenshots instead of real review system
+- No physical address, registration number, or real business identity
+- Product easily found on AliExpress/Temu/Alibaba (gadgets, bowls, beauty tools, pet items, posture braces, etc.)
+- AI-generated product images (too perfect, floating objects, unrealistic lighting)
+- Price is 3-6x the typical AliExpress price for the same product category (use your knowledge of AliExpress pricing to evaluate — if the product is the type commonly sold on AliExpress and the Israeli price suggests a typical dropship markup, add 0.2-0.3)
+- Heavy urgency: countdown timers, "מבצע", "מוגבל", "רק היום", scarcity widgets
+- Single product or very narrow SKU range
+- Fake "handmade" or "Israeli-made" claims for obvious AliExpress goods
+- No real contact beyond WhatsApp/email
+
+LEGITIMATE SIGNALS (each subtracts 0.1-0.2):
+- Real Israeli business with address + VAT/registration number
+- Genuine review platform (Google, Trustpilot, embedded widget)
+- Unique product not available on AliExpress
+- Professional brand with history, social media presence
+- Physical store or studio mentioned
+- Digital product / course / service (score 0.0)
 
 DATA:
 URL: {site.url}
 Title: {site.title}
 Product: {site.product_name}
+Price: {"₪" + str(site.product_price) if site.product_price else "unknown"}
 Shipping: {site.shipping_time}
 Signals: Countdown={site.has_countdown_timer}, Scarcity={site.has_scarcity_widget}
 Text: {site.page_text[:800]}
 
+Score: 0.0=legit, 0.6=borderline dropship, 0.8=clear dropship, 0.9+=scam. MUST be between 0.0 and 1.0, never negative.
 Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "str", "evidence": ["str"] }}"""
         
         # Retry with exponential backoff for rate limits
@@ -224,7 +318,8 @@ Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "
                 resp = await self.client.aio.models.generate_content(model='gemini-2.0-flash', contents=prompt)
                 clean = re.sub(r'^```\w*\n?|```$', '', resp.text.strip())
                 result = json.loads(re.search(r'\{[\s\S]*\}', clean).group())
-                
+                result['score'] = max(0.0, min(1.0, float(result.get('score', 0))))
+
                 # Small delay between successful calls to avoid rate limits
                 await asyncio.sleep(GEMINI_CALL_DELAY)
                 return result
@@ -292,8 +387,11 @@ def update_ad_result(ad_id, result):
     """
     run_psql(sql)
 
+RISK_SCORE_THRESHOLD = 0.6
+
 def upsert_risk_db(url, result):
-    if not result.get('is_risky'): return
+    score = result.get('score', 0)
+    if score < RISK_SCORE_THRESHOLD: return
     
     from urllib.parse import urlparse
     domain = urlparse(url).netloc.replace('www.', '')

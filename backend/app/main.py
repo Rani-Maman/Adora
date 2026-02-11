@@ -3,7 +3,9 @@ FastAPI application entry point.
 """
 
 import time
+import os
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
@@ -16,11 +18,34 @@ from app.api.check import router as check_router
 setup_logging(log_file="logs/api.log", json_logs=True)
 logger = get_logger("api")
 
+# API key for authenticating extension requests
+ADORA_API_KEY = os.getenv("ADORA_API_KEY")
+
 app = FastAPI(
     title="Adora API",
     description="Dropship scam detection API for Israeli e-commerce",
     version=__version__,
 )
+
+# API key verification middleware
+@app.middleware("http")
+async def verify_api_key(request: Request, call_next):
+    """Verify API key for /check and /analyze endpoints."""
+    path = request.url.path
+    # Only protect API endpoints, not health checks
+    protected_paths = ["/check", "/analyze", "/whitelist"]
+    needs_auth = any(path.startswith(p) for p in protected_paths)
+    
+    if needs_auth and ADORA_API_KEY:
+        api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+        if api_key != ADORA_API_KEY:
+            logger.warning(
+                f"Unauthorized API access attempt",
+                extra={"path": path, "client_ip": request.client.host if request.client else "unknown"}
+            )
+            return JSONResponse(status_code=403, content={"error": "Invalid or missing API key"})
+    
+    return await call_next(request)
 
 # Request logging middleware
 @app.middleware("http")

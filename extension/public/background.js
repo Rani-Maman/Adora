@@ -14,7 +14,8 @@ const RISK_THRESHOLD = self.ADORA_CONFIG?.RISK_THRESHOLD || 0.6;
 const SAFE_DOMAINS = self.ADORA_CONFIG?.SAFE_DOMAINS || new Set();
 
 // Cache settings
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (risky)
+const CACHE_TTL_SAFE_MS = 1 * 60 * 60 * 1000; // 1 hour (not risky)
 const CACHE_MAX_SIZE = 1000; // Max cached domains
 
 // In-memory cache (synced with chrome.storage.local)
@@ -131,7 +132,8 @@ async function checkUrl(url, tabId) {
         if (cache.has(domain)) {
             const cached = cache.get(domain);
             const age = Date.now() - (cached.timestamp || 0);
-            if (age < CACHE_TTL_MS) {
+            const ttl = cached.risky ? CACHE_TTL_MS : CACHE_TTL_SAFE_MS;
+            if (age < ttl) {
                 stats.cacheHits++;
                 const ageHours = Math.round(age / (1000 * 60 * 60));
                 log('INFO', `Cache hit: ${domain}`, { 
