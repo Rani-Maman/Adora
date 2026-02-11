@@ -86,7 +86,6 @@ CMD=(
   "--output-dir" "${OUTPUT_DIR}"
   "--dotenv-path" "${DOTENV_PATH}"
   "--job-name" "${JOB_NAME}"
-  "--email-summary"
   "--email-subject-prefix" "${META_DAILY_EMAIL_SUBJECT_PREFIX:-Meta Ads Keyword Nightly}"
   "--max-total-minutes" "${META_DAILY_MAX_TOTAL_MINUTES:-32}"
   "--per-link-timeout-sec" "${META_DAILY_PER_LINK_TIMEOUT_SEC:-1780}"

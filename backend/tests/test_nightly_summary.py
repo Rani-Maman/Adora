@@ -68,34 +68,26 @@ class TestParseRuntime:
         assert "h" not in dur
 
 
-# ── Unit Tests: build_keyword_lines ─────────────────────────────────────
+# ── Unit Tests: _extract_json_keyword_data ────────────────────────────
 
-class TestBuildKeywordLines:
-    """Tests for per-keyword report line generation."""
+class TestExtractJsonKeywordData:
+    """Tests for per-keyword data extraction from JSON reports."""
 
-    def test_keywords_produce_hebrew(self):
-        db_stats = {
-            "keyword_ads": {"mivtsa": 100, "hanaha": 50},
-        }
-        lines = nss.build_keyword_lines(db_stats, [])
-        text = "\n".join(lines)
-        assert "מבצע" in text
-        assert "הנחת" in text
+    def test_extracts_keyword_data(self):
+        reports = [{
+            "summary": {
+                "runtime_seconds": 120,
+                "link_results": [{"keyword": "mivtsa", "selected_rows": 80, "ads_captured": 500}],
+                "db": {"advertisers_inserted": 5, "meta_ads_daily_inserted": 80},
+            }
+        }]
+        kw_data = nss._extract_json_keyword_data(reports)
+        assert "mivtsa" in kw_data
+        assert kw_data["mivtsa"]["selected"] == 80
+        assert kw_data["mivtsa"]["advertisers_inserted"] == 5
 
-    def test_zero_ads_gets_warning_emoji(self):
-        db_stats = {"keyword_ads": {"mivtsa": 0}}
-        lines = nss.build_keyword_lines(db_stats, [])
-        assert any("⚠️" in line for line in lines)
-
-    def test_positive_ads_gets_checkmark(self):
-        db_stats = {"keyword_ads": {"mivtsa": 42}}
-        lines = nss.build_keyword_lines(db_stats, [])
-        assert any("✅" in line for line in lines)
-
-    def test_empty_keywords(self):
-        db_stats = {"keyword_ads": {}}
-        lines = nss.build_keyword_lines(db_stats, [])
-        assert lines == []
+    def test_empty_reports(self):
+        assert nss._extract_json_keyword_data([]) == {}
 
 
 # ── Unit Tests: build_report ────────────────────────────────────────────
@@ -106,29 +98,98 @@ class TestBuildReport:
     def test_report_contains_header(self):
         stats = {
             "total_ads_today": 200,
+            "total_urls_today": 150,
             "new_advertisers": 50,
+            "total_meta_ads_daily": 10000,
+            "total_meta_ads_daily_with_urls": 5000,
             "total_advertisers": 5000,
-            "new_ads_with_urls": 80,
-            "total_ads_with_urls": 3000,
             "keyword_ads": {"mivtsa": 100, "mugbal": 100},
+            "keyword_urls": {"mivtsa": 80, "mugbal": 70},
         }
         report = nss.build_report(stats, [])
-        assert "Facebook Ads Scrape Summary" in report
+        assert "Adora Nightly Scrape" in report
         assert "200" in report  # total ads
         assert "50" in report   # new advertisers
 
     def test_report_contains_db_section(self):
         stats = {
             "total_ads_today": 0,
+            "total_urls_today": 0,
             "new_advertisers": 0,
+            "total_meta_ads_daily": 15000,
+            "total_meta_ads_daily_with_urls": 5000,
             "total_advertisers": 9000,
-            "new_ads_with_urls": 0,
-            "total_ads_with_urls": 4000,
             "keyword_ads": {},
+            "keyword_urls": {},
         }
         report = nss.build_report(stats, [])
         assert "Database" in report
-        assert "9000" in report
+        assert "9,000" in report
+
+    def test_report_keywords_show_hebrew(self):
+        stats = {
+            "total_ads_today": 100,
+            "total_urls_today": 80,
+            "new_advertisers": 5,
+            "total_meta_ads_daily": 10000,
+            "total_meta_ads_daily_with_urls": 5000,
+            "total_advertisers": 5000,
+            "keyword_ads": {"mivtsa": 50, "hanaha": 50},
+            "keyword_urls": {"mivtsa": 40, "hanaha": 40},
+        }
+        report = nss.build_report(stats, [])
+        assert "מבצע" in report
+        assert "הנחת" in report
+
+    def test_report_zero_ads_gets_fail_emoji(self):
+        stats = {
+            "total_ads_today": 0,
+            "total_urls_today": 0,
+            "new_advertisers": 0,
+            "total_meta_ads_daily": 10000,
+            "total_meta_ads_daily_with_urls": 5000,
+            "total_advertisers": 5000,
+            "keyword_ads": {"mivtsa": 0},
+            "keyword_urls": {},
+        }
+        report = nss.build_report(stats, [])
+        assert "❌" in report
+
+    def test_report_positive_ads_gets_checkmark(self):
+        stats = {
+            "total_ads_today": 42,
+            "total_urls_today": 30,
+            "new_advertisers": 3,
+            "total_meta_ads_daily": 10000,
+            "total_meta_ads_daily_with_urls": 5000,
+            "total_advertisers": 5000,
+            "keyword_ads": {"mivtsa": 42},
+            "keyword_urls": {"mivtsa": 30},
+        }
+        report = nss.build_report(stats, [])
+        assert "✅" in report
+
+    def test_report_with_json_data(self):
+        stats = {
+            "total_ads_today": 100,
+            "total_urls_today": 80,
+            "new_advertisers": 5,
+            "total_meta_ads_daily": 10000,
+            "total_meta_ads_daily_with_urls": 5000,
+            "total_advertisers": 5000,
+            "keyword_ads": {"mivtsa": 100},
+            "keyword_urls": {"mivtsa": 80},
+        }
+        json_reports = [{
+            "summary": {
+                "runtime_seconds": 300,
+                "link_results": [{"keyword": "mivtsa", "selected_rows": 100}],
+                "db": {"advertisers_inserted": 5, "meta_ads_daily_inserted": 100},
+            }
+        }]
+        report = nss.build_report(stats, json_reports)
+        assert "5 new" in report
+        assert "95 returning" in report
 
 
 # ── Unit Tests: load_env ──────────────────────────────────────────────

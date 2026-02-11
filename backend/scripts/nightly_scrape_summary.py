@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
 Nightly Meta Ads Scrape Summary.
-Runs once after all keyword jobs finish, sends ONE combined email report
-matching the format:
-    Facebook Ads Scrape Summary - February 02, 2026
-    Runtime: 00:01:02 - 03:40:50 (3h 39m)
-    Results: Total Ads, New Advertisers, Duplicates
-    By Keyword: breakdown per keyword
-    Database: totals
+Runs once at 05:00 after all keyword jobs finish, sends ONE combined email.
+
+Reads per-keyword JSON reports (written by daily_meta_scrape.py) and queries
+the DB for accurate counts.  The JSON files use *target_date* (yesterday) in
+their filename, so we search for yesterday's date.
 """
 
 import datetime
@@ -68,7 +66,7 @@ def load_env():
 
 
 def get_db_conn():
-    """Get a psycopg2 connection using env vars (same as other Adora scripts)."""
+    """Get a psycopg2 connection using env vars."""
     conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         database=os.getenv("DB_NAME", "firecrawl"),
@@ -76,7 +74,6 @@ def get_db_conn():
         password=os.getenv("DB_PASSWORD", ""),
     )
     conn.autocommit = True
-    # Prevent any single query from hanging forever
     cur = conn.cursor()
     cur.execute("SET statement_timeout = '30s'")
     cur.close()
@@ -91,13 +88,25 @@ def _safe_count(cur, sql, params=None):
         return row[0] if row else 0
     except Exception as e:
         logger.warning("Query timed out or failed: %s", e)
-        # Reset the connection state after an error
         cur.connection.rollback()
         return None
 
 
+def _approx_count(cur, table_name):
+    """Fast approximate row count via pg_class."""
+    try:
+        cur.execute(
+            "SELECT reltuples::bigint FROM pg_class WHERE relname = %s",
+            (table_name,),
+        )
+        row = cur.fetchone()
+        return row[0] if row and row[0] > 0 else 0
+    except Exception:
+        return 0
+
+
 def get_db_stats():
-    """Query DB for today's scrape stats and totals."""
+    """Query DB for today's scrape stats."""
     today = datetime.date.today()
     tomorrow = today + datetime.timedelta(days=1)
     stats = {}
@@ -118,14 +127,23 @@ def get_db_stats():
             keyword_ads[kw] = cnt
         stats["keyword_ads"] = keyword_ads
 
-        # Total meta_ads_daily inserted today (all keywords)
-        stats["total_ads_today"] = _safe_count(
-            cur,
-            "SELECT count(*) FROM meta_ads_daily WHERE scraped_at >= %s AND scraped_at < %s",
-            (today, tomorrow),
-        ) or 0
+        # Total meta_ads_daily inserted today
+        stats["total_ads_today"] = sum(keyword_ads.values())
 
-        # New advertisers added today  (may be slow on large table)
+        # Per-keyword ads with valid URLs inserted today
+        cur.execute(
+            "SELECT source_keyword, count(*) FROM meta_ads_daily_with_urls "
+            "WHERE scraped_at >= %s AND scraped_at < %s "
+            "GROUP BY source_keyword ORDER BY source_keyword",
+            (today, tomorrow),
+        )
+        keyword_urls = {}
+        for kw, cnt in cur.fetchall():
+            keyword_urls[kw] = cnt
+        stats["keyword_urls"] = keyword_urls
+        stats["total_urls_today"] = sum(keyword_urls.values())
+
+        # New advertisers added today (first-ever appearance)
         val = _safe_count(
             cur,
             "SELECT count(*) FROM advertisers WHERE scraped_at >= %s AND scraped_at < %s",
@@ -133,27 +151,12 @@ def get_db_stats():
         )
         stats["new_advertisers"] = val if val is not None else 0
 
-        # Total advertisers - use pg_class estimate (instant) instead of count(*)
-        cur.execute(
-            "SELECT reltuples::bigint FROM pg_class WHERE relname = 'advertisers'"
-        )
-        row = cur.fetchone()
-        stats["total_advertisers"] = row[0] if row and row[0] > 0 else 0
+        # Approx totals
+        stats["total_meta_ads_daily"] = _approx_count(cur, "meta_ads_daily")
+        stats["total_meta_ads_daily_with_urls"] = _approx_count(cur, "meta_ads_daily_with_urls")
+        stats["total_advertisers"] = _approx_count(cur, "advertisers")
 
-        # New ads_with_urls added today
-        stats["new_ads_with_urls"] = _safe_count(
-            cur,
-            "SELECT count(*) FROM ads_with_urls WHERE scraped_at >= %s AND scraped_at < %s",
-            (today, tomorrow),
-        ) or 0
-
-        # Total ads_with_urls
-        stats["total_ads_with_urls"] = _safe_count(
-            cur,
-            "SELECT count(*) FROM ads_with_urls",
-        ) or 0
-
-        # Earliest and latest scraped_at today (for runtime window)
+        # Runtime window (earliest/latest scraped_at today)
         cur.execute(
             "SELECT min(scraped_at), max(scraped_at) FROM meta_ads_daily "
             "WHERE scraped_at >= %s AND scraped_at < %s",
@@ -171,10 +174,15 @@ def get_db_stats():
     return stats
 
 
-def collect_json_reports(today_str):
-    """Read today's JSON output files for per-keyword detail."""
-    pattern = os.path.join(OUTPUT_DIR, f"meta_daily_{today_str}_*.json")
+def collect_json_reports(target_date_str):
+    """Read JSON output files for the given target date.
+
+    The keyword jobs run after midnight but target yesterday's date,
+    so file names use yesterday's date: meta_daily_{target_date}_*.json
+    """
+    pattern = os.path.join(OUTPUT_DIR, f"meta_daily_{target_date_str}_*.json")
     files = sorted(glob.glob(pattern))
+    logger.info("Looking for JSON reports: %s -> %d files", pattern, len(files))
     reports = []
     for fpath in files:
         try:
@@ -194,48 +202,38 @@ def parse_runtime(stats):
         return "N/A", "N/A", "N/A"
 
     try:
-        fmt = "%Y-%m-%d %H:%M:%S.%f"
-        # Try with microseconds first, then without
-        for f in [fmt, "%Y-%m-%d %H:%M:%S"]:
+        for fmt in ["%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"]:
             try:
-                t1 = datetime.datetime.strptime(first, f)
+                t1 = datetime.datetime.strptime(first, fmt)
                 break
             except ValueError:
                 t1 = None
-        for f in [fmt, "%Y-%m-%d %H:%M:%S"]:
+        for fmt in ["%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"]:
             try:
-                t2 = datetime.datetime.strptime(last, f)
+                t2 = datetime.datetime.strptime(last, fmt)
                 break
             except ValueError:
                 t2 = None
 
         if t1 and t2:
-            delta = t2 - t1
-            total_sec = int(delta.total_seconds())
+            total_sec = int((t2 - t1).total_seconds())
             hours = total_sec // 3600
             minutes = (total_sec % 3600) // 60
             start_str = t1.strftime("%H:%M:%S")
             end_str = t2.strftime("%H:%M:%S")
-            if hours > 0:
-                dur_str = f"{hours}h {minutes}m"
-            else:
-                dur_str = f"{minutes}m"
+            dur_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
             return start_str, end_str, dur_str
     except Exception:
         pass
     return "N/A", "N/A", "N/A"
 
 
-def build_keyword_lines(db_stats, json_reports):
-    """Build per-keyword report lines with emoji checkmarks.
+def _extract_json_keyword_data(json_reports):
+    """Extract per-keyword data from JSON reports.
 
-    Uses JSON report data (with db_results) for accurate new/duplicate counts.
-    Falls back to DB-only data otherwise.
+    Each report = one keyword job. Returns dict keyed by keyword.
     """
-    keyword_ads = db_stats.get("keyword_ads", {})
-
-    # Extract per-keyword data from JSON reports (each report = one keyword job)
-    json_kw_data = {}
+    kw_data = {}
     for report in json_reports:
         summary = report.get("summary", {})
         runtime = summary.get("runtime_seconds", 0)
@@ -246,97 +244,107 @@ def build_keyword_lines(db_stats, json_reports):
             kw = lr.get("keyword", "")
             if not kw:
                 continue
-            selected = lr.get("selected_rows", 0)
-            json_kw_data[kw] = {
-                "selected": selected,
+            kw_data[kw] = {
+                "selected": lr.get("selected_rows", 0),
+                "ads_captured": lr.get("ads_captured", 0),
                 "runtime_seconds": runtime,
                 "timed_out": lr.get("timed_out", False),
-                # Real new counts from DB operations
+                "meta_ads_daily_inserted": db_results.get("meta_ads_daily_inserted", 0),
+                "meta_ads_daily_with_urls_inserted": db_results.get("meta_ads_daily_with_urls_inserted", 0),
                 "advertisers_inserted": db_results.get("advertisers_inserted", 0),
                 "ads_with_urls_inserted": db_results.get("ads_with_urls_inserted", 0),
             }
-
-    lines = []
-    total_new = 0
-    total_dupes = 0
-    all_keywords = sorted(set(list(keyword_ads.keys()) + list(json_kw_data.keys())))
-
-    for kw in all_keywords:
-        display = KEYWORD_DISPLAY.get(kw, kw)
-        jd = json_kw_data.get(kw, {})
-        selected = jd.get("selected", keyword_ads.get(kw, 0))
-        runtime_sec = jd.get("runtime_seconds", 0)
-
-        # New = advertisers_inserted from db_results (real new count)
-        new = jd.get("advertisers_inserted", 0)
-        dupes = max(0, selected - new)
-        total_new += new
-        total_dupes += dupes
-
-        # Format runtime
-        if runtime_sec > 0:
-            rm = runtime_sec // 60
-            rs = runtime_sec % 60
-            rt_str = f"({rm}m {rs}s)" if rm > 0 else f"({rs}s)"
-        else:
-            rt_str = ""
-
-        status = "✅" if selected > 0 else "⚠️"
-        line = f"{status} {display} - {selected} ads, {new} new, {dupes} duplicates {rt_str}"
-        lines.append(line.strip())
-
-    return lines, total_new, total_dupes
+    return kw_data
 
 
 def build_report(db_stats, json_reports):
     """Build the full email report body."""
     today = datetime.date.today()
+    yesterday = today - datetime.timedelta(days=1)
     date_str = today.strftime("%B %d, %Y")
 
     start_time, end_time, duration = parse_runtime(db_stats)
 
     total_ads = db_stats.get("total_ads_today", 0)
+    total_urls = db_stats.get("total_urls_today", 0)
+    new_advertisers = db_stats.get("new_advertisers", 0)
+    returning = max(0, total_ads - new_advertisers)
 
-    # Get per-keyword lines with accurate new/dup totals
-    kw_lines, total_new, total_dupes = build_keyword_lines(db_stats, json_reports)
+    keyword_ads = db_stats.get("keyword_ads", {})
+    keyword_urls = db_stats.get("keyword_urls", {})
+    json_kw = _extract_json_keyword_data(json_reports)
 
-    # Use per-keyword totals for new advertisers if available,
+    # --- Per-keyword lines ---
+    all_keywords = sorted(set(list(keyword_ads.keys()) + list(json_kw.keys())))
+    kw_lines = []
+    kw_new_total = 0
+
+    for kw in all_keywords:
+        display = KEYWORD_DISPLAY.get(kw, kw)
+        db_count = keyword_ads.get(kw, 0)
+        url_count = keyword_urls.get(kw, 0)
+        jd = json_kw.get(kw, {})
+
+        # Prefer JSON data for selected count; fall back to DB
+        selected = jd.get("selected", db_count)
+        new = jd.get("advertisers_inserted", 0)
+        kw_new_total += new
+        ret = max(0, selected - new)
+
+        # Runtime
+        runtime_sec = jd.get("runtime_seconds", 0)
+        if runtime_sec > 0:
+            rm, rs = divmod(runtime_sec, 60)
+            rt_str = f"{rm}m {rs}s" if rm > 0 else f"{rs}s"
+        else:
+            rt_str = ""
+
+        timed_out = jd.get("timed_out", False)
+        status = "⚠️" if timed_out else ("✅" if selected > 0 else "❌")
+
+        parts = [f"{status} {display} — {selected} ads"]
+        if url_count and url_count != selected:
+            parts.append(f"{url_count} with URLs")
+        parts.append(f"{new} new, {ret} returning")
+        if rt_str:
+            parts.append(rt_str)
+        kw_lines.append(" | ".join(parts))
+
+    # If JSON reports were found use per-keyword new total;
     # otherwise fall back to DB-level count
-    new_advertisers = total_new if total_new > 0 else db_stats.get("new_advertisers", 0)
-    duplicates = max(0, total_ads - new_advertisers)
+    if kw_new_total > 0:
+        new_advertisers = kw_new_total
+        returning = max(0, total_ads - new_advertisers)
 
-    lines = []
-    lines.append(f"Facebook Ads Scrape Summary - {date_str}")
-    lines.append("")
-    lines.append(f"⏰ Runtime: {start_time} - {end_time} ({duration})")
-    lines.append("")
-    lines.append("📊 Results:")
-    lines.append(f"Total Ads Found: {total_ads}")
-    lines.append(f"New Advertisers Added: {new_advertisers}")
-    lines.append(f"Duplicates Skipped: {duplicates}")
-    lines.append("")
-    lines.append("By Keyword:")
-
+    # --- Build report ---
+    lines = [
+        f"Adora Nightly Scrape — {date_str}",
+        f"Target date: {yesterday.isoformat()}",
+        "",
+        f"⏰ {start_time} — {end_time} ({duration})",
+        "",
+        "📊 Results:",
+        f"  Ads Scraped: {total_ads}",
+        f"  With Valid URLs: {total_urls}",
+        f"  New Advertisers: {new_advertisers}",
+        f"  Returning Advertisers: {returning}",
+        "",
+        "📋 By Keyword:",
+    ]
     for kl in kw_lines:
-        lines.append(kl)
+        lines.append(f"  {kl}")
 
-    lines.append("")
-    lines.append("💾 Database:")
-    lines.append(
-        f"- All Advertisers: ~{db_stats['total_advertisers']} total "
-        f"(added {new_advertisers} today)"
-    )
-    lines.append(
-        f"- Ads with Valid URLs: {db_stats['total_ads_with_urls']} total "
-        f"(added {db_stats['new_ads_with_urls']} today)"
-    )
+    lines += [
+        "",
+        "💾 Database Totals:",
+        f"  meta_ads_daily: ~{db_stats.get('total_meta_ads_daily', 0):,}",
+        f"  meta_ads_daily_with_urls: ~{db_stats.get('total_meta_ads_daily_with_urls', 0):,}",
+        f"  advertisers: ~{db_stats.get('total_advertisers', 0):,} (+{new_advertisers} today)",
+        "",
+        "---",
+    ]
 
-    lines.append("")
-    lines.append("---")
-
-    # Save full report to file
-    report_text = "\n".join(lines)
-    return report_text
+    return "\n".join(lines)
 
 
 def send_email(subject, body):
@@ -375,24 +383,22 @@ def main():
     load_env()
 
     today = datetime.date.today()
-    today_str = today.isoformat()
+    yesterday = today - datetime.timedelta(days=1)
 
-    logger.info("Generating nightly scrape summary for %s", today_str)
+    logger.info("Generating nightly scrape summary for %s (target date: %s)", today, yesterday)
 
-    # Get DB stats
     db_stats = get_db_stats()
     logger.info("DB stats: %d ads today, %d new advertisers",
                 db_stats.get('total_ads_today', 0),
                 db_stats.get('new_advertisers', 0))
 
-    # Collect JSON reports from today
-    json_reports = collect_json_reports(today_str)
+    # JSON files use target_date (yesterday) in the filename
+    json_reports = collect_json_reports(yesterday.isoformat())
     logger.info("Found %d JSON report file(s)", len(json_reports))
 
-    # Build report
     report = build_report(db_stats, json_reports)
     logger.info("Report built successfully")
-    print(report)  # Also print for cron log capture
+    print(report)
 
     # Save report to file
     os.makedirs(REPORT_DIR, exist_ok=True)
@@ -404,15 +410,13 @@ def main():
         f.write(report)
     logger.info("Full report saved: %s", report_file)
 
-    # Append report path to the report body
-    report_with_path = report + f"\nFull report saved on VM: {os.path.basename(report_file)}"
+    report_with_path = report + f"\nSaved: {os.path.basename(report_file)}"
 
-    # Send email
     total_ads = db_stats.get("total_ads_today", 0)
     new_adv = db_stats.get("new_advertisers", 0)
     subject = (
-        f"Adora Nightly Scrape: {today.strftime('%Y-%m-%d')} - "
-        f"{total_ads} ads found, {new_adv} new advertisers"
+        f"Adora Nightly Scrape: {today.strftime('%Y-%m-%d')} — "
+        f"{total_ads} ads, {new_adv} new"
     )
     send_email(subject, report_with_path)
 

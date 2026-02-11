@@ -163,24 +163,51 @@ def _extract_page_variables(html: str, doc_id: str) -> dict[str, Any] | None:
     return None
 
 
+# Mapping from URL sort_data[mode] values → GraphQL enum values
+_URL_SORT_MODE_MAP: dict[str, str] = {
+    "relevancy_monthly_grouped": "SORT_BY_RELEVANCY_MONTHLY_GROUPED",
+    "total_impressions": "SORT_BY_IMPRESSIONS_WITH_INDEX",
+    "start_date": "SORT_BY_DATE",
+}
+_URL_SORT_DIR_MAP: dict[str, str] = {
+    "desc": "DESCENDING",
+    "asc": "ASCENDING",
+}
+
+# Default sort: relevancy descending (matches Meta's UI default for keyword search)
+_DEFAULT_SORT_DATA: dict[str, str] = {
+    "mode": "SORT_BY_RELEVANCY_MONTHLY_GROUPED",
+    "direction": "DESCENDING",
+}
+
+
+def _normalize_sort_data(sort_data: dict[str, str] | None) -> dict[str, str]:
+    """Convert URL-format sort values to GraphQL enum values."""
+    if not sort_data:
+        return _DEFAULT_SORT_DATA
+    mode = sort_data.get("mode", "")
+    direction = sort_data.get("direction", "desc")
+    return {
+        "mode": _URL_SORT_MODE_MAP.get(mode, mode),
+        "direction": _URL_SORT_DIR_MAP.get(direction, direction),
+    }
+
+
 def _build_variables(
     keyword: str,
     country: str = "IL",
-    active_status: str = "active",
-    ad_type: str = "ALL",
-    media_type: str = "all",
-    search_type: str = "keyword_unordered",
     cursor: str | None = None,
     session_id: str | None = None,
+    sort_data: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Build the GraphQL variables dict.
+    """Build the GraphQL variables dict matching the real Meta Ad Library request format.
 
     For the Foundation query (page 1): no cursor.
     For the Pagination query (page 2+): pass cursor from previous page.
     """
     v: dict[str, Any] = {
-        "adType": ad_type,
-        "activeStatus": active_status,
+        "activeStatus": "ACTIVE",
+        "adType": "ALL",
         "audienceTimeframe": "LAST_7_DAYS",
         "bylines": [],
         "collationToken": None,
@@ -188,29 +215,30 @@ def _build_variables(
         "countries": [country],
         "country": country,
         "deeplinkAdID": None,
+        "excludedIDs": [],
+        "fetchPageInfo": False,
+        "fetchSharedDisclaimers": False,
+        "hasDeeplinkAdID": False,
         "isAboutTab": False,
         "isAudienceTab": False,
         "isLandingPage": False,
         "isTargetedCountry": False,
-        "hasDeeplinkAdID": False,
         "location": None,
-        "mediaType": media_type,
+        "mediaType": "ALL",
         "multiCountryFilterMode": None,
         "pageIDs": [],
-        "potentialReachInput": None,
+        "potentialReachInput": [],
         "publisherPlatforms": [],
         "queryString": keyword,
-        "regions": None,
-        "searchType": search_type,
+        "regions": [],
+        "searchType": "KEYWORD_UNORDERED",
         "sessionID": session_id or str(uuid.uuid4()),
         "shouldFetchCount": cursor is None,
+        "sortData": _normalize_sort_data(sort_data),
         "source": None,
-        "sortData": None,
         "startDate": None,
-        "fetchPageInfo": False,
-        "fetchSharedDisclaimers": False,
-        "viewAllPageID": "0",
         "v": "385782",
+        "viewAllPageID": "0",
     }
     if cursor:
         v["cursor"] = cursor
@@ -406,19 +434,26 @@ async def run_scrape(args: argparse.Namespace) -> dict[str, Any]:
     keyword = getattr(args, "query", "")
     country = getattr(args, "country", "IL")
 
-    # Extract keyword from URL if not provided directly
-    if not keyword and url:
+    # Extract keyword and sort params from URL if not provided directly
+    sort_data: dict[str, str] | None = None
+    if url:
         parsed = urlparse(url)
         qs = parse_qs(parsed.query)
-        keyword = qs.get("q", [""])[0]
-        country = qs.get("country", [country])[0]
+        if not keyword:
+            keyword = qs.get("q", [""])[0]
+            country = qs.get("country", [country])[0]
+        # Parse sort_data[mode] and sort_data[direction] from URL
+        sort_mode = qs.get("sort_data[mode]", [None])[0]
+        sort_direction = qs.get("sort_data[direction]", [None])[0]
+        if sort_mode:
+            sort_data = {"mode": sort_mode, "direction": sort_direction or "desc"}
 
     if not keyword:
         log.error("No keyword found in args or URL")
         return {"meta": {"error": "no_keyword"}, "ads": []}
 
     start_ts = time.monotonic()
-    log.info("HTTP scraper: keyword=%r country=%s target=%d", keyword, country, target_ads)
+    log.info("HTTP scraper: keyword=%r country=%s target=%d sort=%s", keyword, country, target_ads, sort_data)
 
     page_url = url or _build_page_url(keyword, country)
 
@@ -485,6 +520,7 @@ async def run_scrape(args: argparse.Namespace) -> dict[str, Any]:
             country=country,
             cursor=cursor,
             session_id=session_id,
+            sort_data=sort_data,
         )
         variables["v"] = v_field
 
