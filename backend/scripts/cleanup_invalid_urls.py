@@ -5,6 +5,7 @@ This prevents wasting time and API credits on malformed URLs.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,21 +17,38 @@ script_dir = Path(__file__).resolve().parent
 env_path = script_dir.parent / '.env'
 load_dotenv(env_path)
 
-# Common valid TLDs (same as daily_scrape.py)
+# Common valid TLDs
 VALID_TLDS = {
     '.com', '.org', '.net', '.edu', '.gov', '.co', '.io', '.ai', '.app',
     '.co.il', '.com.au', '.co.uk', '.ca', '.de', '.fr', '.jp', '.cn',
     '.ru', '.br', '.in', '.mx', '.es', '.it', '.nl', '.se', '.no', '.dk',
-    '.info', '.biz', '.me', '.tv', '.shop', '.store', '.online', '.site'
+    '.info', '.biz', '.me', '.tv', '.shop', '.store', '.online', '.site',
+    # Short link / missing from original
+    '.ly', '.li', '.be', '.bz', '.to', '.us', '.ps', '.gy', '.cx', '.cc',
+    '.cl', '.pro', '.im', '.link', '.page', '.fun', '.center', '.health',
+    '.world', '.click', '.blog', '.academy', '.agency', '.studio', '.design',
+    '.digital', '.marketing', '.media', '.technology', '.services', '.social',
+    '.life', '.live', '.today', '.space', '.ltd', '.rest', '.delivery',
+    # Israeli new ccTLD
+    '.il',
 }
+
+# Strip trailing non-URL characters (emoji, Hebrew, timestamps, markdown)
+_TRAILING_GARBAGE = re.compile(r'[\s\u0590-\u05FF\U0001F300-\U0001FFFF✅🚛📲▶️*)()\[\]]+$')
+
+def sanitize_url(url: str) -> str:
+    """Strip trailing garbage characters that aren't part of the URL."""
+    if not url:
+        return url
+    return _TRAILING_GARBAGE.sub('', url.strip())
 
 def is_valid_url(url: str) -> bool:
     """Validate URL has proper structure and known TLD."""
     if not url or not url.strip():
         return False
-    
-    url = url.strip()
-    
+
+    url = sanitize_url(url)
+
     try:
         parsed = urlparse(url)
         
