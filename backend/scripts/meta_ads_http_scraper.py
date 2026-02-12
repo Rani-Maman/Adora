@@ -495,7 +495,7 @@ async def run_scrape(args: argparse.Namespace) -> dict[str, Any]:
     seen_ids: set[str] = set()
     cursor: str | None = None
     total_count: int | None = None
-    max_pages = 50  # safety limit (~30 ads/page = ~1500 max)
+    max_pages = 250  # safety limit (~30 ads/page = ~7500 max)
     session_id = str(uuid.uuid4())
 
     for page_num in range(max_pages):

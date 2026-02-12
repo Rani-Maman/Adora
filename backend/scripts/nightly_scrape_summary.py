@@ -265,14 +265,33 @@ def build_report(db_stats, json_reports):
 
     start_time, end_time, duration = parse_runtime(db_stats)
 
-    total_ads = db_stats.get("total_ads_today", 0)
-    total_urls = db_stats.get("total_urls_today", 0)
-    new_advertisers = db_stats.get("new_advertisers", 0)
-    returning = max(0, total_ads - new_advertisers)
+    # If DB has no timestamps, compute total runtime from JSON reports
+    if start_time == "N/A" and json_reports:
+        total_runtime = sum(
+            r.get("summary", {}).get("runtime_seconds", 0) for r in json_reports
+        )
+        if total_runtime > 0:
+            hours = total_runtime // 3600
+            minutes = (total_runtime % 3600) // 60
+            duration = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+            start_time = "~00:01"
+            end_time = "~05:00"
 
     keyword_ads = db_stats.get("keyword_ads", {})
     keyword_urls = db_stats.get("keyword_urls", {})
     json_kw = _extract_json_keyword_data(json_reports)
+
+    # Prefer JSON-derived totals (ground truth) over DB stats.
+    # DB counts miss returning ads because ON CONFLICT DO NOTHING
+    # leaves scraped_at unchanged, so today's query finds 0 rows.
+    total_ads = db_stats.get("total_ads_today", 0)
+    total_urls = db_stats.get("total_urls_today", 0)
+    if json_kw and total_ads == 0:
+        total_ads = sum(d.get("selected", 0) for d in json_kw.values())
+        total_urls = sum(d.get("ads_with_urls_inserted", d.get("selected", 0)) for d in json_kw.values())
+
+    new_advertisers = db_stats.get("new_advertisers", 0)
+    returning = max(0, total_ads - new_advertisers)
 
     # --- Per-keyword lines ---
     all_keywords = sorted(set(list(keyword_ads.keys()) + list(json_kw.keys())))
