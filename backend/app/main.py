@@ -27,7 +27,7 @@ app = FastAPI(
     version=__version__,
 )
 
-# API key verification middleware
+
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
     """Verify API key for /check and /analyze endpoints."""
@@ -35,30 +35,30 @@ async def verify_api_key(request: Request, call_next):
     # Only protect API endpoints, not health checks
     protected_paths = ["/check", "/analyze", "/whitelist"]
     needs_auth = any(path.startswith(p) for p in protected_paths)
-    
+
     if needs_auth and ADORA_API_KEY:
         api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
         if api_key != ADORA_API_KEY:
             logger.warning(
-                f"Unauthorized API access attempt",
+                "Unauthorized API access attempt",
                 extra={"path": path, "client_ip": request.client.host if request.client else "unknown"}
             )
             return JSONResponse(status_code=403, content={"error": "Invalid or missing API key"})
-    
+
     return await call_next(request)
 
-# Request logging middleware
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log all incoming requests and their response times."""
     start_time = time.time()
-    
+
     # Get client IP
     client_ip = request.client.host if request.client else "unknown"
-    
+
     # Log request
     logger.info(
-        f"Request started",
+        "Request started",
         extra={
             "method": request.method,
             "path": request.url.path,
@@ -67,15 +67,15 @@ async def log_requests(request: Request, call_next):
             "user_agent": request.headers.get("user-agent", "unknown"),
         }
     )
-    
+
     # Process request
     try:
         response = await call_next(request)
         process_time = time.time() - start_time
-        
+
         # Log response
         logger.info(
-            f"Request completed",
+            "Request completed",
             extra={
                 "method": request.method,
                 "path": request.url.path,
@@ -84,7 +84,7 @@ async def log_requests(request: Request, call_next):
                 "client_ip": client_ip,
             }
         )
-        
+
         return response
     except Exception as e:
         process_time = time.time() - start_time
@@ -147,4 +147,3 @@ async def get_tunnel_url():
     except Exception as e:
         logger.error(f"Error reading tunnel URL: {e}")
         return {"url": None, "status": "error", "message": str(e)}
-

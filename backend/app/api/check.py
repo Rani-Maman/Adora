@@ -4,7 +4,6 @@ Used by Chrome extension for real-time site checking.
 """
 
 from fastapi import APIRouter, Query
-from typing import Optional
 import os
 import psycopg2
 import time
@@ -21,7 +20,7 @@ def get_db_connection():
     missing = [var for var in required if not os.getenv(var)]
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
-    
+
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),
         port=int(os.getenv("DB_PORT", 5432)),
@@ -54,16 +53,16 @@ async def check_url(url: str = Query(..., description="URL to check")):
     Returns risk info if found, otherwise returns not risky.
     """
     domain = extract_domain(url)
-    
+
     if not domain:
         logger.warning(f"Invalid URL provided: {url}")
         return {"risky": False, "domain": "", "error": "Invalid URL"}
-    
+
     try:
         start_time = time.time()
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # Query risk_db for exact domain match
         cursor.execute(
             """
@@ -74,15 +73,15 @@ async def check_url(url: str = Query(..., description="URL to check")):
             """,
             (domain,)
         )
-        
+
         result = cursor.fetchone()
         query_time = time.time() - start_time
         cursor.close()
         conn.close()
-        
+
         if result:
             logger.info(
-                f"Domain lookup: RISKY",
+                "Domain lookup: RISKY",
                 extra={
                     "domain": domain,
                     "risk_score": float(result[1]) if result[1] else 0.0,
@@ -98,9 +97,9 @@ async def check_url(url: str = Query(..., description="URL to check")):
                 "advertiser": result[3] if result[3] else None,
                 "first_seen": str(result[4]) if result[4] else None,
             }
-        
+
         logger.info(
-            f"Domain lookup: SAFE",
+            "Domain lookup: SAFE",
             extra={
                 "domain": domain,
                 "query_time_ms": round(query_time * 1000, 2),
@@ -108,7 +107,7 @@ async def check_url(url: str = Query(..., description="URL to check")):
             }
         )
         return {"risky": False, "domain": domain}
-        
+
     except Exception as e:
         logger.error(
             f"Database error checking domain: {domain}",
