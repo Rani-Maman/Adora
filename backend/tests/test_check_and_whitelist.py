@@ -73,7 +73,8 @@ class TestCheckEndpoint:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchone.return_value = (
-            0.85,             # risk_score
+            "scam-shop.com",    # base_url
+            0.85,               # risk_score
             ["countdown timer", "no business ID"],  # evidence
             "Test Advertiser",  # advertiser_name
             "2026-01-15",       # first_seen
