@@ -35,8 +35,8 @@ stateDiagram-v2
     
     state Scraping {
         [*] --> LoadKeywords
-        LoadKeywords --> CallFirecrawl
-        CallFirecrawl --> ParseResponse
+        LoadKeywords --> QueryGraphQL
+        QueryGraphQL --> ParseResponse
         ParseResponse --> ExtractAds
         ExtractAds --> [*]
     }
@@ -94,8 +94,8 @@ stateDiagram-v2
     Analyzing --> Storing: Score Calculated
     
     state Storing {
-        [*] --> SaveToPhysicalProducts
-        SaveToPhysicalProducts --> CheckThreshold
+        [*] --> SaveToDropshipAnalysis
+        SaveToDropshipAnalysis --> CheckThreshold
         CheckThreshold --> AddToRiskDB: Score >= Threshold
         CheckThreshold --> Done: Score < Threshold
         AddToRiskDB --> Done
@@ -182,12 +182,12 @@ stateDiagram-v2
     
     state "advertisers" as ADV
     state "ads_with_urls" as ADS
-    state "physical_products" as PP
+    state "dropship_analysis" as DA
     state "risk_db" as RISK
-    
+
     [*] --> ADV: Scraper Inserts
     ADV --> ADS: Filter Valid URLs
-    ADS --> PP: Analysis Complete
-    PP --> RISK: Score >= Threshold
+    ADS --> DA: Analysis Complete
+    DA --> RISK: Score >= Threshold
     RISK --> [*]: Extension Queries
 ```

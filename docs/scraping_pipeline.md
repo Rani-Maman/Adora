@@ -4,7 +4,7 @@
 
 ## Overview
 
-Adora is an Israeli dropship/scam detection system. It scrapes Facebook/Meta Ad Library for Hebrew keyword ads, analyzes advertiser product sites for dropshipping indicators using Playwright + Gemini AI, and serves risk scores to a Chrome extension in real-time.
+Adora is an Israeli dropship/scam detection system. It scrapes Facebook/Meta Ad Library for Hebrew keyword ads via HTTP GraphQL API, analyzes advertiser product sites using Playwright + Gemini AI, and serves risk scores to a Chrome extension in real-time.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -50,7 +50,7 @@ Adora is an Israeli dropship/scam detection system. It scrapes Facebook/Meta Ad 
 
 ### Architecture
 
-The scraper uses **Playwright browser automation** to navigate the Meta Ad Library, search Hebrew keywords targeting Israel, and extract ad data (advertiser name, page URL, ad body text, link URLs).
+The scraper uses **HTTP requests to Meta's GraphQL API** (`meta_ads_http_scraper.py`) to search the Ad Library for Hebrew keywords targeting Israel and extract ad data (advertiser name, page URL, ad body text, link URLs). No browser automation needed for this stage.
 
 Each keyword runs as an independent cron job, staggered 1 hour apart to avoid rate limits.
 
@@ -58,7 +58,8 @@ Each keyword runs as an independent cron job, staggered 1 hour apart to avoid ra
 
 | File | Role |
 |------|------|
-| `backend/scripts/daily_meta_scrape.py` | Core Playwright scraper (~1050 lines) |
+| `backend/scripts/daily_meta_scrape.py` | Orchestrator: config loading, DB inserts, reporting |
+| `backend/scripts/meta_ads_http_scraper.py` | HTTP GraphQL scraper (pagination, extraction) |
 | `backend/scripts/run_meta_keyword_job.sh` | Bash wrapper with locking, cleanup, timeouts |
 | `backend/scripts/configs/meta_keywords/*.json` | Per-keyword config files (search URL, params) |
 
@@ -67,21 +68,34 @@ Each keyword runs as an independent cron job, staggered 1 hour apart to avoid ra
 ```
 run_meta_keyword_job.sh
   ├── flock (prevent concurrent runs)
-  ├── cleanup_playwright_orphans() (kill stale Chrome)
   ├── timeout --signal=TERM $HARD_TIMEOUT
   └── python3 daily_meta_scrape.py --config $CONFIG
-        ├── Launch Playwright (chromium, headless)
-        ├── Load Meta session cookies (storage state)
+        ├── Load keyword config JSON
         ├── For each ad library search link:
-        │     ├── Navigate to Meta Ad Library URL
-        │     ├── Scroll & collect ads (max 700 scrolls, 45 idle rounds)
-        │     ├── Extract: advertiser_name, page_url, ad_body, external_links
+        │     ├── meta_ads_http_scraper.scrape_meta_ads_http()
+        │     │     ├── POST to Meta GraphQL endpoint
+        │     │     ├── Paginate via forward_cursor (max 250 pages)
+        │     │     ├── Extract: advertiser_name, page_url, ad_body, external_links
+        │     │     └── Stop when: no more results, target_ads reached, or runtime exceeded
         │     └── Filter: remove social URLs (fb, ig, wa, messenger)
+        ├── select_rows_for_keyword() — dedup + select unique advertisers
         ├── Dedup by SHA1(date + keyword + normalized_name)
-        ├── Insert into meta_ads_daily table
-        ├── Also insert into legacy advertisers + ads_with_urls tables
+        ├── Insert into meta_ads_daily + meta_ads_daily_with_urls
+        ├── Insert into advertisers + ads_with_urls (legacy tables)
         └── Save JSON output + log files
 ```
+
+### Scraper Settings (run_meta_keyword_job.sh defaults)
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `retries` | `1` | Retry attempts per search link (2 total tries) |
+| `max-runtime-sec` | `1800` | Max scraping time per link (30 min) |
+| `target-ads-per-link` | `7500` | Stop pagination after N ads (local only) |
+| `max-advertisers-per-keyword` | `0` | Advertiser cap per keyword (0 = uncapped) |
+| `max_pages` | `250` | Max GraphQL pagination pages (in scraper code) |
+| `per-link-timeout-sec` | `1850` | Hard timeout per link including overhead |
+| `max-total-minutes` | `35` | Total job timeout |
 
 ### Deduplication
 
@@ -95,17 +109,6 @@ External URLs are extracted from ad text/links. The following are excluded:
 - Social platforms: `facebook.com`, `instagram.com`, `whatsapp.com`, `wa.me`, `messenger.com`
 - Marketplace/internal: `marketplace.facebook.com`
 - URL shorteners: `bit.ly`, `tinyurl.com`, etc.
-
-### Configuration (Environment Variables)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `META_DAILY_STORAGE_STATE` | — | Path to Playwright storage state (Meta cookies) |
-| `META_DAILY_OUTPUT_DIR` | `./output` | JSON output directory |
-| `META_DAILY_LOG_DIR` | `./logs` | Log directory |
-| `META_DAILY_HARD_TIMEOUT` | `2100` | Max runtime per keyword (seconds) |
-| `META_DAILY_MAX_SCROLLS` | `700` | Max scroll attempts per search link |
-| `META_DAILY_IDLE_ROUNDS` | `45` | Stop scrolling after N rounds with no new ads |
 
 ---
 
@@ -141,7 +144,9 @@ batch_analyze_ads.py (cron: */10)
         ├── Send to Gemini 2.0 Flash with Israeli fraud detection prompt
         ├── Parse JSON response: {score, is_risky, category, reason, evidence}
         ├── UPDATE ads_with_urls SET analysis_score = $score
-        └── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
+        ├── INSERT INTO dropship_analysis (detailed structured result)
+        ├── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
+        └── If borderline (0.45–0.55): append to review_queue.txt
 ```
 
 ### Score Ranges
@@ -152,6 +157,21 @@ batch_analyze_ads.py (cron: */10)
 | 0.3 – 0.5 | Uncertain / needs review |
 | 0.6 – 1.0 | Likely dropship / scam |
 | -1 | Scrape failure (won't be retried) |
+
+### Review Workflow
+
+Borderline sites (score 0.45–0.55 with "dropship" category) are appended to `review_queue.txt`. The interactive CLI tool `review_tool.py` triages them:
+
+```
+review_tool.py
+  ├── Load review_queue.txt entries
+  ├── Filter out already-decided domains (risk_db + review_legit.txt)
+  └── For each site:
+        r = risky  → INSERT INTO risk_db (score ≥ 0.6)
+        l = legit  → append to review_legit.txt
+        s = skip   → defer to next session
+        q = quit   → save remaining, exit
+```
 
 ### Gemini Prompt Design
 
@@ -174,80 +194,96 @@ The Gemini prompt is tuned for Israeli e-commerce fraud:
 
 Runs at **05:00** daily, after all keyword scraping jobs complete. Sends a single email combining results from all 5 keywords.
 
+Data sources: DB queries (per-keyword counts) + JSON report files (runtime, selected counts). Falls back to JSON data when DB returns 0 (due to ON CONFLICT DO NOTHING not updating scraped_at for returning ads).
+
 **Report format:**
 ```
-Facebook Ads Scrape Summary - February 08, 2026
-⏰ Runtime: 00:01:02 - 04:35:50 (4h 34m)
+Adora Nightly Scrape — February 08, 2026
+Target date: 2026-02-07
+
+⏰ 00:01:02 — 04:35:50 (4h 34m)
 
 📊 Results:
-Total Ads Found: 450
-New Advertisers Added: 120
-Duplicates Skipped: 330
+  Ads Scraped: 1850
+  With Valid URLs: 1200
+  New Advertisers: 400
+  Returning Advertisers: 1450
 
-By Keyword:
-✅🟢 150 - מבצע ads, 120 new, 30 duplicates
-✅🟢 100 - מוגבל ads, 80 new, 20 duplicates
-✅🟢 80 - הנחת ads, 60 new, 20 duplicates
-✅🟢 70 - שעות ads, 50 new, 20 duplicates
-✅🟢 50 - עכשיו ads, 40 new, 10 duplicates
+📋 By Keyword:
+  ✅ מבצע — 500 ads | 120 new, 380 returning | 12m 30s
+  ✅ מוגבל — 400 ads | 80 new, 320 returning | 10m 15s
+  ✅ הנחת — 350 ads | 70 new, 280 returning | 9m 45s
+  ✅ שעות — 300 ads | 60 new, 240 returning | 8m 20s
+  ✅ עכשיו — 300 ads | 70 new, 230 returning | 7m 50s
 
-📁 Database:
-- All Advertisers: ~9500 total (added 120 today)
-- Ads with Valid URLs: 4800 total (added 180 today)
+💾 Database Totals:
+  meta_ads_daily: ~15,000
+  meta_ads_daily_with_urls: ~8,000
+  advertisers: ~9,500 (+400 today)
 ```
 
-### Daily Analysis Report (`daily_report.py`)
+### Daily Analysis Report (`batch_analyze_daily_summary.py`)
 
-Runs at **00:01** daily. Reports on the *analysis* pipeline (not scraping):
-- Ads tested yesterday, risky found, safe cleared
+Runs at **23:00** daily. Reports on the *analysis* pipeline (not scraping):
+- Ads tested today, risky found, safe cleared
 - Scrape errors (score = -1), remaining backlog
-- Sent via email + appended to log
+- Sent via email
 
 ---
 
 ## 4. Database Schema
 
+6 tables total. Schema defined in `backend/scripts/create_tables.sql`.
+
 ```
-┌──────────────────┐    ┌──────────────────┐    ┌──────────────┐
-│  meta_ads_daily   │    │   advertisers     │    │ ads_with_urls│
-│ ─────────────── │    │ ─────────────── │    │ ────────────│
-│ id (PK)          │    │ id (PK)          │    │ id (PK)      │
-│ advertiser_name  │    │ advertiser_name  │    │ ad_url       │
-│ page_url         │    │ page_url         │    │ advertiser   │
-│ ad_body          │    │ keyword          │    │ keyword      │
-│ external_links   │    │ scraped_at       │    │ scraped_at   │
-│ source_keyword   │    └──────────────────┘    │analysis_score│
-│ scraped_at       │                            └──────┬───────┘
-│ dedup_key (UNQ)  │                                   │
-└──────────────────┘                                   │ batch_analyze
-                                                       │ (score ≥ 0.6)
-                                                       ▼
-                         ┌──────────────────┐    ┌──────────────┐
-                         │ dropship_analysis│    │   risk_db    │
-                         │ ─────────────── │    │ ────────────│
-                         │ analysis details │    │ base_url(UNQ)│
-                         │ red_flags        │    │ risk_score   │
-                         │ aliexpress match │    │ evidence[]   │
-                         │ scoring          │    │ advertiser   │
-                         └──────────────────┘    │ first_seen   │
-                                                 │ last_updated │
-                                                 └──────────────┘
-                                                       ▲
-                                                       │ /check/?url=
-                                                 ┌─────┴──────┐
-                                                 │ Chrome Ext │
-                                                 └────────────┘
+┌──────────────────┐    ┌────────────────────────┐
+│  meta_ads_daily   │    │ meta_ads_daily_with_urls│
+│ ─────────────── │    │ ────────────────────── │
+│ ad_unique_key(UNQ)│    │ ad_unique_key (UNQ)    │
+│ advertiser_name  │    │ advertiser_name        │
+│ ad_text          │    │ destination_product_url │
+│ source_keyword   │    │ source_keyword         │
+│ scraped_at       │    │ scraped_at             │
+└──────────────────┘    └────────────────────────┘
+
+┌──────────────────┐    ┌──────────────────────┐
+│   advertisers     │    │    ads_with_urls      │
+│ ─────────────── │    │ ────────────────────│
+│ advertiser_name  │    │ advertiser_name(UNQ) │
+│   (UNQ)          │    │ destination_url(UNQ) │
+│ scraped_at       │    │ analysis_score       │
+└──────────────────┘    │ analysis_json (JSONB)│
+                        │ analyzed_at          │
+                        └──────────┬───────────┘
+                                   │ batch_analyze
+                                   │ (score ≥ 0.6)
+                                   ▼
+┌──────────────────┐    ┌──────────────────┐
+│ dropship_analysis│    │    risk_db        │
+│ ─────────────── │    │ ──────────────── │
+│ dest_url (UNQ)   │    │ base_url (UNQ)   │
+│ full_response    │    │ risk_score       │
+│ domain, flags    │    │ evidence[]       │
+│ confidence       │    │ first_seen       │
+│ analyzed_at      │    │ last_updated     │
+└──────────────────┘    └──────────────────┘
+                               ▲
+                               │ /check/?url=
+                        ┌──────┴───────┐
+                        │  Chrome Ext  │
+                        └──────────────┘
 ```
 
 ### Table Purposes
 
 | Table | Purpose | Write Source |
 |-------|---------|--------------|
-| `meta_ads_daily` | Per-day deduped ads from Playwright scraper | `daily_meta_scrape.py` |
-| `advertisers` | All scraped advertisers (legacy + new) | `daily_meta_scrape.py` |
-| `ads_with_urls` | Filtered subset with valid external URLs | `daily_meta_scrape.py` |
-| `dropship_analysis` | Detailed analysis results | `batch_analyze_ads.py` |
-| `risk_db` | Final risk DB — only risky sites, queried by extension | `batch_analyze_ads.py` |
+| `meta_ads_daily` | All scraped ads, deduped by SHA1 key | `daily_meta_scrape.py` |
+| `meta_ads_daily_with_urls` | Subset with valid external URLs | `daily_meta_scrape.py` |
+| `advertisers` | Unique advertisers by name | `daily_meta_scrape.py` |
+| `ads_with_urls` | Unique ads by destination URL, scored by analysis | `daily_meta_scrape.py` + `batch_analyze_ads.py` |
+| `dropship_analysis` | Detailed Gemini analysis per product URL | `batch_analyze_ads.py` |
+| `risk_db` | Risky domains (score >= 0.6), queried by extension | `batch_analyze_ads.py` + `review_tool.py` |
 
 ---
 
@@ -304,27 +340,28 @@ User navigates to URL
 
 | Time | Job | Description |
 |------|-----|-------------|
-| `00:01` | `daily_report.py` | Yesterday's analysis summary email |
 | `00:01` | `01_mivtsa.json` | Scrape keyword: מבצע |
 | `01:00` | `02_mugbal.json` | Scrape keyword: מוגבל |
 | `02:00` | `03_hanaha.json` | Scrape keyword: הנחת |
 | `03:00` | `04_shaot.json` | Scrape keyword: שעות |
 | `04:00` | `05_achshav.json` | Scrape keyword: עכשיו |
 | `05:00` | `nightly_scrape_summary.py` | Combined scrape results email |
-| `*/10` | `batch_analyze_ads.py` | Analyze 20 unscored ads |
+| `*/10 8-23` | `batch_analyze_ads.py` | Analyze 20 unscored ads (Playwright + Gemini) |
+| `23:00` | `batch_analyze_daily_summary.py` | Daily analysis summary email |
 
 ---
 
 ## 8. Infrastructure
 
-- **VM**: Oracle Cloud (Ubuntu 22.04)
+- **VM**: Oracle Cloud (Ubuntu 22.04, 956MB RAM, 2 cores)
 - **Database**: PostgreSQL 14 (localhost)
 - **Python**: 3.10 (system)
-- **Browser**: Playwright Chromium (headless)
+- **Meta Scraper**: HTTP GraphQL (no browser needed)
+- **Site Analyzer**: Playwright Chromium (headless, batch_analyze only)
 - **AI**: Google Gemini 2.0 Flash
 - **Email**: Gmail SMTP (App Password)
 - **Extension**: Chrome extension served locally (dev mode) or via Chrome Web Store
-- **API Tunnel**: Cloudflare Quick Tunnel (development) or direct IP
+- **API Tunnel**: Cloudflare tunnel (cloudflared service)
 
 ---
 
@@ -332,15 +369,16 @@ User navigates to URL
 
 ```
 1. SCRAPE (nightly, 5 keywords, staggered hourly)
-   Meta Ad Library → Playwright → meta_ads_daily + advertisers + ads_with_urls
+   Meta Ad Library GraphQL API → HTTP scraper → meta_ads_daily + meta_ads_daily_with_urls + advertisers + ads_with_urls
 
 2. ANALYZE (every 10 min, batch of 20)
-   ads_with_urls (unscored) → Playwright site scrape → Gemini AI → risk_db
+   ads_with_urls (unscored) → Playwright site scrape → Gemini AI → dropship_analysis + risk_db
+   Borderline scores (0.45–0.55) → review_queue.txt → review_tool.py → risk_db or legit
 
 3. SERVE (real-time)
    Chrome Extension → FastAPI /check → risk_db → badge + popup warning
 
 4. REPORT (daily)
-   05:00 → nightly_scrape_summary.py → combined email
-   00:01 → daily_report.py → analysis stats email
+   05:00 → nightly_scrape_summary.py → combined scrape email
+   23:00 → batch_analyze_daily_summary.py → analysis stats email
 ```
