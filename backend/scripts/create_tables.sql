@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS risk_db (
     evidence TEXT[],
     advertiser_name TEXT,
     first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    price_matches JSONB DEFAULT '[]'::jsonb
 );
 
 CREATE INDEX IF NOT EXISTS idx_risk_db_base_url ON risk_db(base_url);

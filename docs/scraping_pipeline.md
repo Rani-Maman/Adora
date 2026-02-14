@@ -229,9 +229,74 @@ Runs at **23:00** daily. Reports on the *analysis* pipeline (not scraping):
 - Scrape errors (score = -1), remaining backlog
 - Sent via email
 
+### Price Match Report (`batch_price_match.py`)
+
+Runs at **07:01** daily via `run_price_match.sh` (flock, max 110 min runtime). Sends email with:
+- Products processed/matched/skipped/failed, match rate %
+- Top 3 highest-markup finds (domain, product, markup ratio)
+- Runtime
+
 ---
 
-## 4. Database Schema
+## 4. Price Matching Pipeline
+
+### Architecture
+
+`batch_price_match.py` uses **Gemini 2.0 Flash with Google Search grounding** to find cheaper alternatives for products on risky sites. It queries all domains in `risk_db`, scrapes their product pages for names and ILS prices, then asks Gemini to search AliExpress, Temu, Alibaba, and other wholesale platforms for matching products.
+
+### Components
+
+| File | Role |
+|------|------|
+| `backend/scripts/batch_price_match.py` | Main batch processor + email summary |
+| `backend/scripts/run_price_match.sh` | Cron wrapper with flock, env loading, logging |
+
+### Flow
+
+```
+run_price_match.sh (cron: 07:01 daily)
+  ├── flock (prevent concurrent runs)
+  ├── Load .env via grep (avoids source .env issues)
+  └── python3 batch_price_match.py --max-runtime 6600
+        ├── Query risk_db for all risky domains
+        ├── For each domain:
+        │     ├── Scrape product pages → extract product names + ILS prices
+        │     ├── For each product:
+        │     │     ├── Gemini 2.0 Flash + Google Search grounding
+        │     │     ├── Search: "product name AliExpress/Temu/Alibaba price USD"
+        │     │     └── Parse: [{source, title, price_usd, url, match_type}]
+        │     └── Store matches in price_matches JSONB column
+        ├── Send email summary (match rate, top markups)
+        └── Log to /home/ubuntu/adora_ops/logs/price_match/
+```
+
+### Price Match Data Format (JSONB)
+
+```json
+[
+  {
+    "product_name_english": "Electric Facial Hair Remover",
+    "price_ils": 197.0,
+    "product_url": "https://site.co.il/products/...",
+    "matched_at": "2026-02-13T09:13:40",
+    "matches": [
+      {
+        "source": "Temu",
+        "title": "Rechargeable Eyebrow Razor...",
+        "price_usd": 3.74,
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/...",
+        "match_type": "similar"
+      }
+    ]
+  }
+]
+```
+
+**Note:** Most URLs are temporary Gemini grounding redirects (`vertexaisearch.cloud.google.com`). The extension replaces these with platform search links at display time.
+
+---
+
+## 5. Database Schema
 
 6 tables total. Schema defined in `backend/scripts/create_tables.sql`.
 
@@ -259,14 +324,14 @@ Runs at **23:00** daily. Reports on the *analysis* pipeline (not scraping):
                                    │ (score ≥ 0.6)
                                    ▼
 ┌──────────────────┐    ┌──────────────────┐
-│ dropship_analysis│    │    risk_db        │
-│ ─────────────── │    │ ──────────────── │
-│ dest_url (UNQ)   │    │ base_url (UNQ)   │
-│ full_response    │    │ risk_score       │
-│ domain, flags    │    │ evidence[]       │
-│ confidence       │    │ first_seen       │
-│ analyzed_at      │    │ last_updated     │
-└──────────────────┘    └──────────────────┘
+│ dropship_analysis│    │    risk_db         │
+│ ─────────────── │    │ ───────────────── │
+│ dest_url (UNQ)   │    │ base_url (UNQ)    │
+│ full_response    │    │ risk_score        │
+│ domain, flags    │    │ evidence[]        │
+│ confidence       │    │ price_matches JSON│
+│ analyzed_at      │    │ first/last_updated│
+└──────────────────┘    └───────────────────┘
                                ▲
                                │ /check/?url=
                         ┌──────┴───────┐
@@ -283,11 +348,11 @@ Runs at **23:00** daily. Reports on the *analysis* pipeline (not scraping):
 | `advertisers` | Unique advertisers by name | `daily_meta_scrape.py` |
 | `ads_with_urls` | Unique ads by destination URL, scored by analysis | `daily_meta_scrape.py` + `batch_analyze_ads.py` |
 | `dropship_analysis` | Detailed Gemini analysis per product URL | `batch_analyze_ads.py` |
-| `risk_db` | Risky domains (score >= 0.6), queried by extension | `batch_analyze_ads.py` + `review_tool.py` |
+| `risk_db` | Risky domains (score >= 0.6) + price_matches JSONB, queried by extension | `batch_analyze_ads.py` + `review_tool.py` + `batch_price_match.py` |
 
 ---
 
-## 5. Chrome Extension
+## 6. Chrome Extension
 
 ### Architecture
 
@@ -304,20 +369,44 @@ User navigates to URL
 
 ### Badge Behavior
 - **No badge**: Site not in risk_db or whitelisted
-- **Red "!"**: Risk score ≥ 0.6 — popup shows warning with evidence
+- **Red "!"**: Risk score >= 0.6 — banner + popup show warning with price comparisons
+
+### UI Components
+
+**Page Banner** (`content.js`): Auto-injected at top of risky sites. Shows:
+- "Potential Dropship Site Detected" warning
+- Price comparison cards with cheaper alternatives (up to 3 products, 3 sources each)
+- Markup badges (e.g. "14.1x markup"), ILS prices, View links to source platforms
+- "No cheaper alternatives found yet" message when price data pending
+- Dismiss button
+
+**Popup** (`App.jsx`): Click extension icon. Shows:
+- Adora logo + "Dropship Detector" header
+- For risky sites: warning + price comparison cards (same data as banner)
+- For safe sites: "No concerns detected"
+- Hover disclaimer (ⓘ icon)
+
+### Price Display Logic
+- USD→ILS conversion: `price_usd / 0.27`
+- Deduplication: similar product names collapsed (substring match after normalization)
+- Per product: cheapest match from each unique source (up to 3 sources)
+- Expired Google redirect URLs replaced with platform search links (AliExpress, Temu, Alibaba)
 
 ### Key Files
 
 | File | Role |
 |------|------|
-| `extension/public/background.js` | Service worker — auto-checks on tab navigation |
-| `extension/public/config.js` | API base URL configuration |
-| `extension/src/App.jsx` | React popup UI |
+| `extension/public/background.js` | Service worker — API calls, caching, badge updates |
+| `extension/public/content.js` | Content script — page banner injection with price cards |
+| `extension/public/config.js` | Auto-generated config (API base, whitelist, thresholds) |
+| `extension/src/App.jsx` | React popup UI with price comparisons |
+| `extension/src/App.css` | Popup styles |
+| `extension/build-config.js` | Build script — generates config.js from .env + whitelists |
 | `extension/public/manifest.json` | Chrome Manifest V3 |
 
 ---
 
-## 6. FastAPI Backend
+## 7. FastAPI Backend
 
 ### Endpoints
 
@@ -325,7 +414,7 @@ User navigates to URL
 |--------|------|---------|
 | `GET` | `/` | Health check |
 | `GET` | `/health` | Detailed health info |
-| `GET` | `/check/?url=X` | Lightweight risk_db lookup (extension uses this) |
+| `GET` | `/check/?url=X` | Risk lookup + price_matches from risk_db (extension uses this) |
 | `POST` | `/analyze/` | On-demand deep analysis (Playwright + Gemini) |
 | `GET` | `/whitelist/domains` | Full whitelist |
 | `GET` | `/whitelist/check/{domain}` | Single domain whitelist check |
@@ -336,7 +425,7 @@ User navigates to URL
 
 ---
 
-## 7. Cron Schedule (VM)
+## 8. Cron Schedule (VM)
 
 | Time | Job | Description |
 |------|-----|-------------|
@@ -346,12 +435,13 @@ User navigates to URL
 | `03:00` | `04_shaot.json` | Scrape keyword: שעות |
 | `04:00` | `05_achshav.json` | Scrape keyword: עכשיו |
 | `05:00` | `nightly_scrape_summary.py` | Combined scrape results email |
-| `*/10 8-23` | `batch_analyze_ads.py` | Analyze 20 unscored ads (Playwright + Gemini) |
+| `07:01` | `run_price_match.sh` | Batch price matching via Gemini grounding (max 110 min) |
+| `*/10 9-23` | `batch_analyze_ads.py` | Analyze 20 unscored ads (Playwright + Gemini) |
 | `23:00` | `batch_analyze_daily_summary.py` | Daily analysis summary email |
 
 ---
 
-## 8. Infrastructure
+## 9. Infrastructure
 
 - **VM**: Oracle Cloud (Ubuntu 22.04, 956MB RAM, 2 cores)
 - **Database**: PostgreSQL 14 (localhost)
@@ -365,7 +455,7 @@ User navigates to URL
 
 ---
 
-## 9. End-to-End Data Flow
+## 10. End-to-End Data Flow
 
 ```
 1. SCRAPE (nightly, 5 keywords, staggered hourly)
@@ -375,10 +465,17 @@ User navigates to URL
    ads_with_urls (unscored) → Playwright site scrape → Gemini AI → dropship_analysis + risk_db
    Borderline scores (0.45–0.55) → review_queue.txt → review_tool.py → risk_db or legit
 
-3. SERVE (real-time)
-   Chrome Extension → FastAPI /check → risk_db → badge + popup warning
+3. PRICE MATCH (daily at 07:01)
+   risk_db (risky domains) → batch_price_match.py → Gemini 2.0 Flash with grounding
+   → Search AliExpress/Temu/Alibaba for cheaper alternatives → price_matches JSONB in risk_db
+   → Email summary with match rate, top markups, runtime
 
-4. REPORT (daily)
+4. SERVE (real-time)
+   Chrome Extension → FastAPI /check → risk_db (score + price_matches) → banner + popup
+   Extension shows: risk warning, cheaper alternatives (multi-source), markup badges, search links
+
+5. REPORT (daily)
    05:00 → nightly_scrape_summary.py → combined scrape email
+   07:01 → run_price_match.sh → price match email with stats + top markups
    23:00 → batch_analyze_daily_summary.py → analysis stats email
 ```

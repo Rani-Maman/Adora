@@ -63,6 +63,7 @@ if (!env.API_BASE) {
 }
 
 const API_BASE = env.API_BASE;
+const API_KEY = env.API_KEY || '';
 const RISK_THRESHOLD = env.RISK_THRESHOLD || '0.6';
 
 // Convert Set to sorted array for consistent output
@@ -74,6 +75,7 @@ const configContent = `// Extension Configuration (auto-generated from .env and 
 
 const config = {
     API_BASE: '${API_BASE}',
+    API_KEY: '${API_KEY}',
     RISK_THRESHOLD: ${RISK_THRESHOLD},
     SAFE_DOMAINS: new Set(${JSON.stringify(sortedDomains)})
 };

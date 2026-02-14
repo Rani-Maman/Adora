@@ -12,13 +12,17 @@ stateDiagram-v2
     state "API" as API
     state "Client" as CL
     
+    state "Price Match" as PM
+
     [*] --> DC: Daily Cron
     DC --> ST: Store Ads
     ST --> AN: Process Queue
     AN --> ST: Save Results
+    ST --> PM: Risky Domains
+    PM --> ST: Save Matches
     API --> ST: Query
     CL --> API: Check URL
-    API --> CL: Risk Score
+    API --> CL: Risk + Prices
 ```
 
 ---
@@ -124,7 +128,7 @@ stateDiagram-v2
         CheckWhitelist --> CheckTrustedTLD: Not in Whitelist
         CheckTrustedTLD --> ReturnSafe: .gov.il/.ac.il/.edu
         CheckTrustedTLD --> QueryRiskDB: Unknown
-        QueryRiskDB --> ReturnRisk: Found
+        QueryRiskDB --> ReturnRisk: Found (score + price_matches)
         QueryRiskDB --> ReturnUnknown: Not Found
         ReturnSafe --> [*]
         ReturnRisk --> [*]
@@ -162,7 +166,10 @@ stateDiagram-v2
         ShowCached --> ShowWarning: Was Risky
         ShowCached --> Silent: Was Safe
         SkipCheck --> Silent
-        ShowWarning --> [*]
+        ShowWarning --> ShowPrices: Has Matches
+        ShowWarning --> ShowScanning: No Matches Yet
+        ShowPrices --> [*]
+        ShowScanning --> [*]
         Silent --> [*]
     }
     

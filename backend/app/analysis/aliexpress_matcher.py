@@ -1,173 +1,113 @@
 """
-AliExpress price comparison module.
-Extracts product info from Israeli sites and searches for matches on AliExpress.
+Price matching module — finds cheaper alternatives on AliExpress/Temu/Alibaba.
+Uses Gemini 2.5 Flash with Google Search grounding for real product lookups.
 """
 
+import json
 import os
 import re
-from typing import Any, Optional
 
 from google import genai
+from google.genai import types
 
 from app.logging_config import get_logger
 
 logger = get_logger("aliexpress_matcher")
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+MODEL = "gemini-2.5-flash"
+ILS_TO_USD = 0.27
 
 
-class AliExpressMatcher:
-    """
-    Compares Israeli product prices with AliExpress.
-    Uses Gemini to analyze both the original site and search AliExpress.
-    """
-
-    def __init__(self, model_name: str = DEFAULT_MODEL):
-        self.model_name = model_name
-        self._client = None
-        self._configure_api()
-
-    def _configure_api(self) -> None:
+class PriceMatcher:
+    def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            logger.warning("GEMINI_API_KEY not set")
-            return
+            raise ValueError("GEMINI_API_KEY not set")
         self._client = genai.Client(api_key=api_key)
-        logger.info("AliExpress matcher initialized")
 
-    async def analyze_product(self, product_url: str) -> dict[str, Any]:
-        """
-        Analyze a product page and check if it exists on AliExpress at lower price.
-
-        Returns:
-            {
-                "is_dropship": bool,
-                "confidence": float,
-                "israeli_price": str,
-                "aliexpress_price": str,
-                "price_ratio": float,  # Israeli price / AliExpress price
-                "evidence": list[str],
-                "aliexpress_url": str (if found)
-            }
-        """
-        if not self._client:
-            return self._error_result("API not configured")
-
-        # Step 1: Extract product info from Israeli site
-        product_info = await self._extract_product_info(product_url)
-        if not product_info:
-            return self._error_result("Could not extract product info")
-
-        # Step 2: Search for matching product on AliExpress
-        match_result = await self._find_aliexpress_match(product_info)
-
-        return match_result
-
-    async def _extract_product_info(self, url: str) -> Optional[dict]:
-        """Extract product details from an Israeli e-commerce site."""
-        prompt = f"""Visit this Israeli product page and extract details:
-
-URL: {url}
-
-Return ONLY valid JSON:
-{{
-    "product_name": "exact Hebrew product name",
-    "product_name_english": "translated to English",
-    "price_ils": 0.0,
-    "description_keywords": ["keyword1", "keyword2"],
-    "image_description": "brief description of main product image"
-}}"""
-
+    async def extract_product_info(self, page_text: str) -> dict | None:
+        """Extract product info from Hebrew page text. No search grounding."""
+        prompt = (
+            "Analyze this Israeli product page text and extract product details.\n"
+            "Translate the product name to generic English search terms (not brand name).\n"
+            "Hebrew names won't work on AliExpress — use descriptive English.\n\n"
+            f"Page text:\n{page_text}\n\n"
+            "Return ONLY valid JSON:\n"
+            "{\n"
+            '  "product_name_hebrew": "original name",\n'
+            '  "product_name_english": "generic English search terms",\n'
+            '  "price_ils": 0.0,\n'
+            '  "category": "electronics|clothing|home|beauty|toys|other",\n'
+            '  "key_features": ["feature1", "feature2"],\n'
+            '  "search_query": "optimized AliExpress search query"\n'
+            "}"
+        )
         try:
             response = await self._client.aio.models.generate_content(
-                model=self.model_name, contents=prompt
+                model=MODEL, contents=prompt
             )
-            text = response.text.strip()
-            text = re.sub(r"^```\w*\n?|```$", "", text)
-            match = re.search(r"\{[\s\S]*\}", text)
-            if match:
-                import json
-
-                return json.loads(match.group())
+            return self._parse_json(response.text)
         except Exception as e:
-            logger.error(f"Product extraction failed: {e}")
-        return None
+            logger.error(f"Extract failed: {e}")
+            return None
 
-    async def _find_aliexpress_match(self, product_info: dict) -> dict[str, Any]:
-        """Search AliExpress for a matching product and compare prices."""
+    async def search_cheaper(self, product_info: dict) -> dict:
+        """Search for cheaper alternatives using Google Search grounding."""
+        name = product_info.get("product_name_english", "")
+        features = product_info.get("key_features", [])
+        price = product_info.get("price_ils", 0)
+        search_q = product_info.get("search_query", name)
+        usd = round(price * ILS_TO_USD, 2) if price else "?"
 
-        product_name = product_info.get("product_name_english", "")
-        keywords = product_info.get("description_keywords", [])
-        israeli_price = product_info.get("price_ils", 0)
-        image_desc = product_info.get("image_description", "")
+        prompt = (
+            "You have google_search enabled. "
+            "Search for this product on AliExpress, Temu, and Alibaba and "
+            "tell me what you find.\n\n"
+            f"Product: {name}\n"
+            f"Features: {', '.join(features)}\n"
+            f"Israeli price: {price} ILS (~${usd})\n"
+            f"Search query suggestion: {search_q}\n\n"
+            "Search for similar products. For each result you find, tell me:\n"
+            "- The product name/title\n"
+            "- The price (in USD if possible)\n"
+            "- Which site it's from (AliExpress, Temu, Alibaba, etc)\n"
+            "- The URL from the search results\n\n"
+            "It's OK to include redirect URLs from search. "
+            "Include whatever you can find. If prices aren't in the snippet, "
+            "estimate based on what you see or say unknown.\n\n"
+            "Return up to 5 results as JSON:\n"
+            '{"matches": [{"source": "site", "product_name": "title", '
+            '"price_usd": 0.00, "url": "url", "similarity": "exact/similar"}], '
+            '"search_query_used": "query"}'
+        )
 
-        # search_query = f"{product_name} {' '.join(keywords[:3])}"
-
-        prompt = f"""Search AliExpress for this product and find the best match:
-
-PRODUCT TO FIND:
-- Name (English): {product_name}
-- Keywords: {', '.join(keywords)}
-- Image description: {image_desc}
-- Israeli price: ₪{israeli_price}
-
-TASK:
-1. Search AliExpress.com for this product
-2. Find the most similar product listing
-3. Note the AliExpress price in USD or ILS
-4. Compare the prices
-
-ANALYSIS:
-If the Israeli store is selling the SAME product at 3x+ the AliExpress price, it's likely dropshipping.
-
-Return ONLY valid JSON:
-{{
-    "found_match": true/false,
-    "aliexpress_product": "name of matching product on AliExpress",
-    "aliexpress_price_usd": 0.0,
-    "aliexpress_price_ils": 0.0,
-    "match_confidence": 0.0-1.0,
-    "price_ratio": 0.0,
-    "is_dropship": true/false,
-    "evidence": ["reason1", "reason2"]
-}}"""
+        config = types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())]
+        )
 
         try:
             response = await self._client.aio.models.generate_content(
-                model=self.model_name, contents=prompt
+                model=MODEL, contents=prompt, config=config
             )
-            text = response.text.strip()
-            text = re.sub(r"^```\w*\n?|```$", "", text)
-            match = re.search(r"\{[\s\S]*\}", text)
-            if match:
-                import json
-
-                result = json.loads(match.group())
-                result["israeli_price"] = f"₪{israeli_price}"
+            result = self._parse_json(response.text)
+            if result:
+                # Attach grounding metadata
+                if response.candidates and response.candidates[0].grounding_metadata:
+                    meta = response.candidates[0].grounding_metadata
+                    if meta.web_search_queries:
+                        result["grounding_queries"] = meta.web_search_queries
                 return result
         except Exception as e:
-            logger.error(f"AliExpress search failed: {e}")
+            logger.error(f"Search failed: {e}")
 
-        return self._error_result("Could not search AliExpress")
+        return {"matches": [], "no_match_reason": "API error"}
 
-    def _error_result(self, reason: str) -> dict[str, Any]:
-        return {
-            "is_dropship": False,
-            "confidence": 0.0,
-            "evidence": [reason],
-            "error": True,
-        }
-
-
-async def check_if_dropshipping(product_url: str) -> dict[str, Any]:
-    """
-    Convenience function to check if a product is being dropshipped.
-
-    Args:
-        product_url: URL of the Israeli product page
-
-    Returns:
-        Analysis result with dropshipping determination
-    """
-    matcher = AliExpressMatcher()
-    return await matcher.analyze_product(product_url)
+    def _parse_json(self, text: str) -> dict | None:
+        cleaned = re.sub(r"^```\w*\n?|```$", "", text.strip())
+        m = re.search(r"\{[\s\S]*\}", cleaned)
+        if m:
+            try:
+                return json.loads(m.group())
+            except json.JSONDecodeError:
+                pass
+        return None

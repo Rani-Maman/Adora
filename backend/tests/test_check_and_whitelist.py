@@ -78,6 +78,7 @@ class TestCheckEndpoint:
             ["countdown timer", "no business ID"],  # evidence
             "Test Advertiser",  # advertiser_name
             "2026-01-15",       # first_seen
+            None,               # price_matches
         )
         mock_db.return_value = mock_conn
 

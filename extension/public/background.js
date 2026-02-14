@@ -89,7 +89,7 @@ function isSafeDomain(domain) {
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CHECK_URL') {
-        checkUrl(message.url, sender.tab.id).then(sendResponse);
+        checkUrl(message.url, sender.tab?.id).then(sendResponse);
         return true; // Keep channel open for async response
     }
     if (message.type === 'GET_STATS') {

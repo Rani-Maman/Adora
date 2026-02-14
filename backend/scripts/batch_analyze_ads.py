@@ -78,6 +78,10 @@ SKIP_URL_PATTERNS = [
     r'^https?://(?:www\.)?youtube\.com/',      # YouTube (video platform)
     r'^https?://(?:www\.)?youtu\.be/',
     r'^https?://temu\.to/',                    # Temu affiliate redirects (hangs Playwright)
+    r'^https?://(?:\w+\.)?shein\.com/',          # Shein (legit marketplace)
+    r'^https?://(?:\w+\.)?aliexpress\.com/',     # AliExpress (legit marketplace)
+    r'^https?://s\.click\.aliexpress\.com/',     # AliExpress affiliate links
+    r'^https?://(?:\w+\.)?temu\.com/',           # Temu (legit marketplace)
 ]
 
 def should_skip_url(url: str) -> bool:
@@ -333,6 +337,7 @@ LEGITIMATE SIGNALS (each subtracts 0.1-0.2):
 - Unique product not available on AliExpress
 - Professional brand with history, social media presence
 - Physical store or studio mentioned
+- Handmade / artisan / custom-made product (pre-order + longer shipping is normal for creators — do NOT penalize single-product stores if the product appears original/handmade, not mass-produced AliExpress goods)
 - Digital product / course / service (score 0.0)
 
 DATA:

@@ -16,7 +16,7 @@ logger = get_logger("check")
 
 def get_db_connection():
     """Get database connection."""
-    required = ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"]
+    required = ["DB_HOST", "DB_NAME", "DB_USER"]
     missing = [var for var in required if not os.getenv(var)]
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
@@ -66,7 +66,7 @@ async def check_url(url: str = Query(..., description="URL to check")):
         # Query risk_db for exact domain match
         cursor.execute(
             """
-            SELECT base_url, risk_score, evidence, advertiser_name, first_seen
+            SELECT base_url, risk_score, evidence, advertiser_name, first_seen, price_matches
             FROM risk_db
             WHERE LOWER(TRIM(base_url)) = LOWER(%s)
             LIMIT 1
@@ -89,6 +89,9 @@ async def check_url(url: str = Query(..., description="URL to check")):
                     "found": True,
                 }
             )
+            # Parse price_matches — psycopg2 returns JSONB as Python objects
+            price_matches = result[5] if result[5] else []
+
             return {
                 "risky": True,
                 "domain": result[0],
@@ -96,6 +99,7 @@ async def check_url(url: str = Query(..., description="URL to check")):
                 "evidence": result[2] if result[2] else [],
                 "advertiser": result[3] if result[3] else None,
                 "first_seen": str(result[4]) if result[4] else None,
+                "price_matches": price_matches,
             }
 
         logger.info(

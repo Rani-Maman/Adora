@@ -18,10 +18,16 @@ body {
 .header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid #334155;
+}
+
+.header-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
 }
 
 .header h1 {
@@ -106,37 +112,74 @@ body {
   color: #fecaca;
 }
 
-.score {
-  display: inline-block;
-  margin-top: 4px;
+
+.no-matches {
   font-size: 12px;
   color: #fca5a5;
   background: rgba(0,0,0,0.2);
-  padding: 3px 8px;
-  border-radius: 6px;
-}
-
-.reason {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #fecaca;
-  margin-bottom: 12px;
-}
-
-.evidence {
-  font-size: 12px;
-  color: #fca5a5;
+  padding: 10px 12px;
+  border-radius: 8px;
   margin-bottom: 16px;
+  line-height: 1.5;
 }
 
-.evidence ul {
-  margin-top: 6px;
-  padding-left: 18px;
+.price-matches {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #e2e8f0;
 }
 
-.evidence li {
-  margin-bottom: 4px;
-  opacity: 0.9;
+.price-matches strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #67e8f9;
+  font-size: 13px;
+}
+
+.price-card {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(103,232,249,0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.price-card-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: #f0f9ff;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.price-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.markup-badge {
+  background: #dc2626;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.price-link {
+  color: #67e8f9;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.price-link:hover {
+  text-decoration: underline;
 }
 
 .disclaimer {
@@ -153,12 +196,31 @@ body {
   text-align: center;
 }
 
-.footer a {
+.info-trigger {
+  position: relative;
   color: #64748b;
-  text-decoration: none;
-  font-size: 12px;
+  font-size: 14px;
+  cursor: default;
 }
 
-.footer a:hover {
+.info-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
   color: #94a3b8;
+  font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  width: 220px;
+  text-align: center;
+  line-height: 1.4;
+  border: 1px solid #334155;
+  white-space: normal;
+}
+
+.info-trigger:hover .info-tooltip {
+  display: block;
 }
