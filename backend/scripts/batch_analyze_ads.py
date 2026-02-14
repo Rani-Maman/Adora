@@ -117,6 +117,7 @@ class SiteData:
     has_scarcity_widget: bool = False
     has_whatsapp_only: bool = False
     page_text: str = ""
+    tos_text: str = ""
     error: str = ""
 
 class SiteScraper:
@@ -255,6 +256,39 @@ class SiteScraper:
                                 except ValueError: pass
                         except Exception:
                             pass
+
+                # --- TOS / Terms page scraping ---
+                try:
+                    links = await page.eval_on_selector_all(
+                        'a[href]',
+                        'els => els.map(e => ({href: e.href, text: (e.innerText||"").trim().substring(0,60)}))'
+                    )
+                    tos_url = None
+                    for link in links:
+                        href = (link.get('href') or '').lower()
+                        text = (link.get('text') or '').lower()
+                        # Match by href path
+                        if re.search(r'/(?:terms|tos|policies|policy|terms-of-service|terms-and-conditions|shipping-policy|refund-policy)', href):
+                            tos_url = link['href']
+                            break
+                        # Match by Hebrew/English link text
+                        if re.search(r'תנאי|מדיניות|terms|policy', text):
+                            tos_url = link['href']
+                            break
+                    if tos_url:
+                        tos_page = await context.new_page()
+                        try:
+                            await tos_page.goto(tos_url, wait_until="domcontentloaded", timeout=15000)
+                            tos_body = await tos_page.inner_text("body")
+                            data.tos_text = tos_body[:2000]
+                            logger.info(f"  TOS scraped: {len(data.tos_text)} chars from {tos_url[:80]}")
+                        except Exception:
+                            pass
+                        finally:
+                            await tos_page.close()
+                except Exception:
+                    pass
+
             finally:
                 await page.close()
         except Exception as e:
@@ -291,6 +325,7 @@ STRONG DROPSHIP SIGNALS (each adds 0.2-0.3):
 - Single product or very narrow SKU range
 - Fake "handmade" or "Israeli-made" claims for obvious AliExpress goods
 - No real contact beyond WhatsApp/email
+- Terms of Service / About page admits: third-party suppliers, dropshipping, shipping from China/overseas, products sourced externally, AliExpress/Alibaba fulfillment
 
 LEGITIMATE SIGNALS (each subtracts 0.1-0.2):
 - Real Israeli business with address + VAT/registration number
@@ -308,6 +343,7 @@ Price: {"₪" + str(site.product_price) if site.product_price else "unknown"}
 Shipping: {site.shipping_time}
 Signals: Countdown={site.has_countdown_timer}, Scarcity={site.has_scarcity_widget}
 Text: {site.page_text[:800]}
+{f"Terms/Policy page: {site.tos_text[:600]}" if site.tos_text else ""}
 
 Score: 0.0=legit, 0.6=borderline dropship, 0.8=clear dropship, 0.9+=scam. MUST be between 0.0 and 1.0, never negative.
 Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "str", "evidence": ["str"] }}"""
