@@ -448,11 +448,23 @@ User navigates to URL
 | `02:00` | `03_hanaha.json` | Scrape keyword: הנחת |
 | `03:00` | `04_shaot.json` | Scrape keyword: שעות |
 | `04:00` | `05_achshav.json` | Scrape keyword: עכשיו |
-| `05:00` | `nightly_scrape_summary.py` | Combined scrape results email |
+| `05:00` | `nightly_scrape_summary.py` | Combined scrape results email + reset dispatch mode to `analyze` |
 | `06:01` | `run_price_match.sh --retry-failures` | Retry previously failed price matches |
 | `07:01–12:01` | `run_price_match.sh` | Hourly batch price matching (max 110 min each) |
-| `*/10 13-23` | `batch_analyze_ads.py` | Analyze 20 unscored ads (Playwright + Gemini) |
+| `*/10 13-23` | `run_batch_dispatch.sh` | Dispatcher: analyze ads if pending, else price match until midnight |
 | `23:00` | `batch_analyze_daily_summary.py` | Daily analysis summary email |
+
+### Dispatch Mode (`/tmp/adora_mode`)
+
+The */10 cron uses a dispatcher that reads `/tmp/adora_mode`:
+- `analyze` (default): runs `batch_analyze_ads.py` to score unscored ads
+- `price_match`: runs `run_price_match.sh` for price matching
+
+Mode switches automatically:
+- **analyze → price_match**: when `batch_analyze_ads.py` finds 0 unscored ads
+- **price_match → analyze**: when `nightly_scrape_summary.py` runs (05:00, after new ads scraped)
+
+Price match flock prevents overlap with morning price_match crons. VM reboot resets to `analyze` (file in /tmp).
 
 ---
 
