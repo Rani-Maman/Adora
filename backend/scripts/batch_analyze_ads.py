@@ -239,12 +239,40 @@ class SiteScraper:
                     try: data.product_price = float(raw)
                     except ValueError: pass
 
-                # If no price found (listicle/landing page), follow first /products/ link
+                # If no price found (listicle/landing/advertorial page), follow product link
                 if not data.product_price:
+                    # Try /products/ links first, then CTA buttons
                     product_links = await page.eval_on_selector_all(
                         'a[href*="/products/"]',
                         'els => els.map(e => e.href)'
                     )
+                    if not product_links:
+                        # Look for CTA buttons on advertorial/funnel pages
+                        try:
+                            cta = await page.evaluate("""() => {
+                                var links = Array.from(document.querySelectorAll("a[href]"));
+                                var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours/i;
+                                var productRe = /\\/products\\/|\\/product\\/|checkout|cart|shop/i;
+                                var curPath = location.pathname;
+                                var curHost = location.hostname;
+                                for (var i = 0; i < links.length; i++) {
+                                    var a = links[i];
+                                    var t = (a.innerText || "").trim();
+                                    var href = a.href || "";
+                                    if (!href || href.indexOf("javascript:") === 0) continue;
+                                    try {
+                                        var u = new URL(href);
+                                        if (u.pathname === curPath && u.hostname === curHost) continue;
+                                        if (ctaRe.test(t) && href.indexOf("http") === 0) return href;
+                                        if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) return href;
+                                    } catch(e) {}
+                                }
+                                return null;
+                            }""")
+                            if cta:
+                                product_links = [cta]
+                        except Exception:
+                            pass
                     if product_links:
                         try:
                             prod_page = await context.new_page()
@@ -362,21 +390,42 @@ Text: {site.page_text[:800]}
 Score: 0.0=legit, 0.6=borderline dropship, 0.8=clear dropship, 0.9+=scam. MUST be between 0.0 and 1.0, never negative.
 Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "str", "evidence": ["str"] }}"""
         
-        # Retry with exponential backoff for rate limits
+        # Retry with exponential backoff for rate limits and parse errors
         for attempt in range(GEMINI_RETRY_ATTEMPTS):
             try:
                 resp = await self.client.aio.models.generate_content(model='gemini-2.0-flash', contents=prompt)
                 clean = re.sub(r'^```\w*\n?|```$', '', resp.text.strip())
-                result = json.loads(re.search(r'\{[\s\S]*\}', clean).group())
+                match = re.search(r'\{[\s\S]*\}', clean)
+                if not match:
+                    raise ValueError("No JSON object in response")
+                raw_json = match.group()
+                try:
+                    result = json.loads(raw_json)
+                except json.JSONDecodeError:
+                    # Attempt JSON repair: fix trailing commas, unescaped quotes
+                    fixed = re.sub(r',\s*}', '}', raw_json)
+                    fixed = re.sub(r',\s*]', ']', fixed)
+                    fixed = re.sub(r':\s*"([^"]*)"([^",}\]]*)"', r': "\1\2"', fixed)
+                    result = json.loads(fixed)
                 result['score'] = max(0.0, min(1.0, float(result.get('score', 0))))
 
                 # Small delay between successful calls to avoid rate limits
                 await asyncio.sleep(GEMINI_CALL_DELAY)
                 return result
-                
+
+            except (json.JSONDecodeError, ValueError, AttributeError) as e:
+                # JSON parse failure — retry with explicit JSON instruction
+                if attempt < GEMINI_RETRY_ATTEMPTS - 1:
+                    logger.warning(f"Parse error, retrying ({attempt + 1}/{GEMINI_RETRY_ATTEMPTS}): {e}")
+                    await asyncio.sleep(GEMINI_CALL_DELAY)
+                    continue
+                logger.error(f"Gemini parse error after {GEMINI_RETRY_ATTEMPTS} attempts: {e}")
+                # Return None score so ad stays unscored and gets retried next batch
+                return {"score": None, "is_risky": False, "category": "parse_error", "reason": str(e)}
+
             except Exception as e:
                 error_str = str(e)
-                
+
                 # Check if it's a rate limit error (429)
                 if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
                     if attempt < GEMINI_RETRY_ATTEMPTS - 1:
@@ -384,11 +433,12 @@ Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "
                         logger.warning(f"Rate limited. Retrying in {delay:.1f}s (attempt {attempt + 1}/{GEMINI_RETRY_ATTEMPTS})")
                         await asyncio.sleep(delay)
                         continue
-                
+
                 logger.error(f"Gemini error: {e}")
-                return {"score": 0.0, "is_risky": False, "category": "error", "reason": error_str}
-        
-        return {"score": 0.0, "is_risky": False, "category": "error", "reason": "Max retries exceeded"}
+                # Return None score so ad stays unscored and gets retried next batch
+                return {"score": None, "is_risky": False, "category": "api_error", "reason": error_str}
+
+        return {"score": None, "is_risky": False, "category": "api_error", "reason": "Max retries exceeded"}
 
 # --- DB Utilities (Subprocess) ---
 def run_psql(sql):
@@ -396,8 +446,8 @@ def run_psql(sql):
     return subprocess.run(cmd, capture_output=True, text=True)
 
 def fetch_unscored_ads(limit=10):
-    sql = f"""SELECT id, destination_product_url FROM ads_with_urls 
-    WHERE analysis_score IS NULL 
+    sql = f"""SELECT id, destination_product_url FROM ads_with_urls
+    WHERE analysis_score IS NULL
       AND destination_product_url IS NOT NULL
       AND destination_product_url NOT LIKE '%facebook.com%'
       AND destination_product_url NOT LIKE '%instagram.com%'
@@ -421,14 +471,18 @@ def fetch_unscored_ads(limit=10):
     return ads
 
 def update_ad_result(ad_id, result):
+    score = result.get('score')
+    # None score = Gemini error, leave as NULL so it gets retried
+    if score is None:
+        return
     # Escape single quotes for SQL
     reason = str(result.get('reason', '')).replace("'", "''")
     cat = str(result.get('category', '')).replace("'", "''")
     json_str = json.dumps(result).replace("'", "''")
-    
+
     sql = f"""
-    UPDATE ads_with_urls 
-    SET analysis_score = {result.get('score', 0)},
+    UPDATE ads_with_urls
+    SET analysis_score = {score},
         analysis_category = '{cat}',
         analysis_reason = '{reason}',
         analysis_json = '{json_str}',

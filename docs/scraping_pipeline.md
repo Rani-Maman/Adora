@@ -137,6 +137,7 @@ batch_analyze_ads.py (cron: */10)
   ├── Launch single Playwright browser (reused for batch)
   └── For each ad:
         ├── Navigate to product URL
+        ├── If no price: follow /products/ links or CTA buttons (advertorial pages)
         ├── Extract SiteData:
         │     title, product_name, price, shipping_time,
         │     business_id (ח.פ.), countdown_timer, scarcity_widgets,

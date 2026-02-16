@@ -252,7 +252,7 @@ class SiteScraper:
         await self.start()
 
     async def scrape(self, url: str) -> str:
-        """Scrape page text. Returns empty string on failure."""
+        """Scrape page text. Follows CTA links on advertorial pages."""
         if not self.browser:
             await self.restart()
 
@@ -271,6 +271,49 @@ class SiteScraper:
                     text = await page.inner_text("body")
                 except Exception:
                     pass  # keep whatever we got from first attempt
+
+            # Follow CTA links on advertorial/funnel pages to find the product
+            # These pages have a fake article with a CTA button linking to the real product
+            try:
+                cta_url = await page.evaluate("""() => {
+                    var links = Array.from(document.querySelectorAll("a[href]"));
+                    var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours/i;
+                    var productRe = /\\/products\\/|\\/product\\/|checkout|cart|shop/i;
+                    var curPath = location.pathname;
+                    var curHost = location.hostname;
+                    for (var i = 0; i < links.length; i++) {
+                        var a = links[i];
+                        var t = (a.innerText || "").trim();
+                        var href = a.href || "";
+                        if (!href || href.indexOf("javascript:") === 0) continue;
+                        try {
+                            var u = new URL(href);
+                            // Skip same-page anchors
+                            if (u.pathname === curPath && u.hostname === curHost) continue;
+                            // Match by CTA text
+                            if (ctaRe.test(t) && href.indexOf("http") === 0) return href;
+                            // Match by product URL pattern on same domain
+                            if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) return href;
+                        } catch(e) {}
+                    }
+                    return null;
+                }""")
+                if cta_url:
+                    logger.info(f"  Following CTA link: {cta_url[:80]}")
+                    prod_page = await context.new_page()
+                    try:
+                        await prod_page.goto(cta_url, wait_until="domcontentloaded", timeout=30000)
+                        await prod_page.wait_for_timeout(3000)
+                        prod_text = await prod_page.inner_text("body")
+                        if prod_text.strip():
+                            text += "\n[PRODUCT PAGE]\n" + prod_text[:4000]
+                    except Exception:
+                        pass
+                    finally:
+                        await prod_page.close()
+            except Exception:
+                pass
+
             return text[:8000]
         except Exception as e:
             logger.warning(f"Scrape failed {url}: {e}")
