@@ -429,6 +429,9 @@ def update_ad_result(ad_id, result):
     run_psql(sql)
 
 RISK_SCORE_THRESHOLD = 0.6
+REVIEW_QUEUE_FILE = os.getenv("REVIEW_QUEUE_FILE", "/home/ubuntu/adora_ops/review_queue.txt")
+BORDERLINE_LOW = 0.45
+BORDERLINE_HIGH = 0.6  # exclusive — everything below RISK_SCORE_THRESHOLD
 
 def upsert_risk_db(url, result):
     score = result.get('score', 0)
@@ -443,9 +446,44 @@ def upsert_risk_db(url, result):
     INSERT INTO risk_db (base_url, risk_score, evidence, first_seen, last_updated)
     VALUES ('{domain}', {score}, '{evidence}', NOW(), NOW())
     ON CONFLICT (base_url) 
-    DO UPDATE SET risk_score = {score}, evidence = '{evidence}', last_updated = NOW();
+    DO UPDATE SET
+        -- Keep the highest score ever seen for this domain. This avoids "unflagging"
+        -- due to model variability and guards against accidental threshold regressions.
+        risk_score = GREATEST(risk_db.risk_score, EXCLUDED.risk_score),
+        evidence = EXCLUDED.evidence,
+        last_updated = NOW();
     """
     run_psql(sql)
+
+
+def append_review_queue(url, result):
+    """Append borderline sites (0.45-0.59) to review_queue.txt for manual triage."""
+    score = result.get('score', 0)
+    if not (BORDERLINE_LOW <= score < BORDERLINE_HIGH):
+        return
+
+    from urllib.parse import urlparse
+    domain = urlparse(url).netloc.replace('www.', '')
+    reason = result.get('reason', '')[:200]
+
+    # Dedup: skip if domain already in file
+    try:
+        if os.path.isfile(REVIEW_QUEUE_FILE):
+            with open(REVIEW_QUEUE_FILE, 'r', encoding='utf-8') as f:
+                existing = f.read()
+            if domain in existing:
+                return
+    except Exception:
+        pass
+
+    line = f"{domain} | score={score:.2f} | {reason}\n"
+    try:
+        with open(REVIEW_QUEUE_FILE, 'a', encoding='utf-8') as f:
+            f.write(line)
+        logger.info(f"  -> review queue: {domain} (score={score:.2f})")
+    except Exception as e:
+        logger.warning(f"Failed to write review queue: {e}")
+
 
 # --- Main ---
 async def main():
@@ -484,6 +522,7 @@ async def main():
             
             update_ad_result(ad_id, res)
             upsert_risk_db(url, res)
+            append_review_queue(url, res)
     finally:
         # Always clean up browser
         await scraper.stop()

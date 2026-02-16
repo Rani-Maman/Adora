@@ -118,7 +118,10 @@ CREATE TABLE IF NOT EXISTS risk_db (
     advertiser_name TEXT,
     first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    price_matches JSONB DEFAULT '[]'::jsonb
+    price_matches JSONB DEFAULT '[]'::jsonb,
+    price_match_failures JSONB DEFAULT '[]'::jsonb,
+    -- risk_db is intended to contain only risky domains (>= 0.6). Enforce at DB level.
+    CONSTRAINT risk_db_min_score CHECK (risk_score >= 0.6)
 );
 
 CREATE INDEX IF NOT EXISTS idx_risk_db_base_url ON risk_db(base_url);

@@ -4,7 +4,7 @@ Batch price matcher — finds cheaper AliExpress/Temu alternatives for risk_db p
 Scrapes product pages with Playwright, uses Gemini 2.5 Flash + Google Search grounding.
 Stores results in risk_db.price_matches JSONB column.
 
-Usage: python3 batch_price_match.py [--max-runtime 3600]
+Usage: python3 batch_price_match.py [--max-runtime 3600] [--retry-failures]
 """
 
 import asyncio
@@ -28,6 +28,8 @@ from dotenv import load_dotenv
 _parser = argparse.ArgumentParser()
 _parser.add_argument("--max-runtime", type=int, default=3600)
 _parser.add_argument("--dotenv-path", default=None)
+_parser.add_argument("--retry-failures", action="store_true",
+                     help="Retry previously failed products instead of new ones")
 _args, _ = _parser.parse_known_args()
 
 load_dotenv(_args.dotenv_path if _args.dotenv_path else None)
@@ -49,6 +51,21 @@ MODEL = "gemini-2.5-flash"
 ILS_TO_USD = 0.27
 GEMINI_CALL_DELAY = 2  # seconds between API calls
 MAX_RUNTIME = _args.max_runtime
+RETRY_MODE = _args.retry_failures
+
+# URL patterns that are never real product pages
+BAD_URL_PATTERNS = [
+    r"^https?://(www\.)?t\.me/",
+    r"^https?://[^/]*minisite\.ms/",
+    r"^https?://[^/]*urlgeni\.us/",
+    r"^https?://[^/]*ravpage\.co\.il/",
+    r"^https?://[^/]*bit\.ly/",
+    r"^https?://[^/]*linktr\.ee/",
+    r"/collections/?$",
+    r"/product-category/?$",
+    r"/categories/?$",
+]
+_bad_url_re = re.compile("|".join(BAD_URL_PATTERNS), re.IGNORECASE)
 
 # Stats
 stats = {"processed": 0, "matched": 0, "failed": 0, "skipped": 0}
@@ -81,7 +98,7 @@ def get_eligible_products():
         JOIN ads_with_urls a ON LOWER(TRIM(r.base_url)) = LOWER(TRIM(
             REPLACE(SPLIT_PART(a.destination_product_url, '/', 3), 'www.', '')
         ))
-        WHERE a.analysis_category ILIKE '%dropship%'
+        WHERE a.analysis_category ILIKE '%%dropship%%'
         AND a.destination_product_url IS NOT NULL
         AND LENGTH(a.destination_product_url) > 20
         AND a.destination_product_url ~ '^https?://[^/]+/.+'
@@ -92,12 +109,35 @@ def get_eligible_products():
         AND a.destination_product_url NOT LIKE '%%s.click.aliexpress.com%%'
         AND (r.price_matches IS NULL
              OR NOT r.price_matches::text LIKE '%%' || a.destination_product_url || '%%')
+        AND (r.price_match_failures IS NULL
+             OR NOT r.price_match_failures::text LIKE '%%' || a.destination_product_url || '%%')
         ORDER BY r.risk_score DESC
     """)
     rows = cur.fetchall()
     cur.close()
     conn.close()
     logger.info(f"Found {len(rows)} eligible products")
+    return rows
+
+
+def get_failed_products():
+    """Get products that previously failed, for retry."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT r.id, r.base_url, r.risk_score, f->>'url' as product_url
+        FROM risk_db r,
+             jsonb_array_elements(COALESCE(r.price_match_failures, '[]'::jsonb)) f
+        WHERE r.risk_score >= 0.6
+        AND r.base_url NOT LIKE '%%shein.com'
+        AND r.base_url NOT LIKE '%%aliexpress.com'
+        AND r.base_url NOT LIKE '%%temu.%%'
+        ORDER BY r.risk_score DESC
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    logger.info(f"Found {len(rows)} failed products to retry")
     return rows
 
 
@@ -115,7 +155,6 @@ def save_price_match(risk_db_id: str, product_url: str, result: dict):
         "matched_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Append to existing array or create new one
     cur.execute("""
         UPDATE risk_db
         SET price_matches = COALESCE(price_matches, '[]'::jsonb) || %s::jsonb,
@@ -126,6 +165,52 @@ def save_price_match(risk_db_id: str, product_url: str, result: dict):
     conn.commit()
     cur.close()
     conn.close()
+
+
+def save_failure(risk_db_id: str, product_url: str, reason: str):
+    """Append failure record to risk_db.price_match_failures JSONB array."""
+    conn = get_db()
+    cur = conn.cursor()
+
+    entry = {
+        "url": product_url,
+        "reason": reason,
+        "failed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    cur.execute("""
+        UPDATE risk_db
+        SET price_match_failures = COALESCE(price_match_failures, '[]'::jsonb) || %s::jsonb,
+            last_updated = NOW()
+        WHERE id = %s
+    """, (Json([entry]), risk_db_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def clear_failure(risk_db_id: str, product_url: str):
+    """Remove a failure entry after successful retry."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE risk_db
+        SET price_match_failures = (
+            SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+            FROM jsonb_array_elements(COALESCE(price_match_failures, '[]'::jsonb)) elem
+            WHERE elem->>'url' != %s
+        )
+        WHERE id = %s
+    """, (product_url, risk_db_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def is_bad_url(url: str) -> bool:
+    """Check if URL matches known-bad patterns."""
+    return bool(_bad_url_re.search(url))
 
 
 class SiteScraper:
@@ -175,10 +260,18 @@ class SiteScraper:
         try:
             context = await self.browser.new_context()
             page = await context.new_page()
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(3000)
+            await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            await page.wait_for_timeout(5000)
             text = await page.inner_text("body")
-            return text[:5000]
+            # If very little text, try networkidle for JS-heavy pages
+            if len(text.strip()) < 200:
+                try:
+                    await page.goto(url, wait_until="networkidle", timeout=45000)
+                    await page.wait_for_timeout(3000)
+                    text = await page.inner_text("body")
+                except Exception:
+                    pass  # keep whatever we got from first attempt
+            return text[:8000]
         except Exception as e:
             logger.warning(f"Scrape failed {url}: {e}")
             return ""
@@ -228,8 +321,41 @@ async def search_cheaper(client, product_info: dict) -> dict:
     """Step 2: Search for cheaper alternatives (with google_search grounding)."""
     name = product_info.get("product_name_english", "")
     features = product_info.get("key_features", [])
-    price = product_info.get("price_ils", 0)
+    raw_price = product_info.get("price_ils", 0)
     search_q = product_info.get("search_query", name)
+
+    # Normalize LLM outputs to expected types.
+    if isinstance(name, list):
+        name = next(
+            (str(x).strip() for x in name if x is not None and str(x).strip()), ""
+        )
+    elif name is None:
+        name = ""
+    else:
+        name = str(name).strip()
+
+    if isinstance(features, str):
+        features = [features]
+    elif not isinstance(features, list):
+        features = []
+    features = [str(x).strip() for x in features if x is not None and str(x).strip()]
+
+    try:
+        price = float(raw_price) if raw_price else 0
+    except (ValueError, TypeError):
+        price = 0
+
+    if isinstance(search_q, list):
+        search_q = next(
+            (str(x).strip() for x in search_q if x is not None and str(x).strip()), ""
+        )
+    elif search_q is None:
+        search_q = ""
+    else:
+        search_q = str(search_q).strip()
+    if not search_q:
+        search_q = name
+
     usd = round(price * ILS_TO_USD, 2) if price else "?"
 
     prompt = (
@@ -264,7 +390,44 @@ async def search_cheaper(client, product_info: dict) -> dict:
         )
         await asyncio.sleep(GEMINI_CALL_DELAY)
         result = parse_json(resp.text)
-        return result if result else {"matches": [], "no_match_reason": "parse error"}
+        if result:
+            return result
+
+        # Retry with stricter prompt on parse failure
+        logger.info("  Parse failed, retrying with strict prompt...")
+        retry_prompt = (
+            f"Search AliExpress/Temu for: {search_q}\n"
+            "Return ONLY this JSON, nothing else:\n"
+            '{"matches": [{"source": "site", "product_name": "title", '
+            '"price_usd": 0.00, "url": "url", "similarity": "exact/similar"}], '
+            '"search_query_used": "query"}'
+        )
+        resp2 = await client.aio.models.generate_content(
+            model=MODEL, contents=retry_prompt, config=config
+        )
+        await asyncio.sleep(GEMINI_CALL_DELAY)
+        result2 = parse_json(resp2.text)
+        if result2:
+            return result2
+
+        # Last resort: extract price/URL from raw text via regex
+        raw = resp.text or ""
+        urls = re.findall(r"https?://(?:www\.)?(?:aliexpress|temu|alibaba)\S+", raw)
+        prices = re.findall(r"\$(\d+\.?\d*)", raw)
+        if urls:
+            fallback_matches = []
+            for i, u in enumerate(urls[:3]):
+                p = float(prices[i]) if i < len(prices) else 0
+                fallback_matches.append({
+                    "source": "aliexpress" if "aliexpress" in u else "temu" if "temu" in u else "alibaba",
+                    "product_name": name[:60],
+                    "price_usd": p,
+                    "url": u.rstrip(".,)\"'"),
+                    "similarity": "similar",
+                })
+            return {"matches": fallback_matches, "search_query_used": search_q}
+
+        return {"matches": [], "no_match_reason": "parse error"}
     except Exception as e:
         logger.error(f"Search error: {e}")
         return {"matches": [], "no_match_reason": str(e)}
@@ -275,11 +438,19 @@ async def process_product(client, scraper, risk_id, domain, score, url):
     t0 = time.time()
     logger.info(f"[{stats['processed']+1}] {domain} (score={score}) — {url}")
 
+    # Pre-filter known-bad URLs
+    if is_bad_url(url):
+        logger.warning(f"  SKIP: bad URL pattern")
+        stats["skipped"] += 1
+        save_failure(risk_id, url, "url_pattern_filtered")
+        return
+
     # Scrape
     page_text = await scraper.scrape(url)
     if not page_text:
         logger.warning(f"  SKIP: no page text")
         stats["skipped"] += 1
+        save_failure(risk_id, url, "scrape_empty")
         return
 
     # Extract
@@ -287,25 +458,45 @@ async def process_product(client, scraper, risk_id, domain, score, url):
     if not info:
         logger.warning(f"  SKIP: extraction failed")
         stats["failed"] += 1
+        save_failure(risk_id, url, "extraction_failed")
         return
 
-    eng_name = info.get("product_name_english") or ""
+    raw_eng_name = info.get("product_name_english")
+    # LLM sometimes returns a list of candidate names; take the first non-empty.
+    if isinstance(raw_eng_name, list):
+        eng_name = next(
+            (
+                str(x).strip()
+                for x in raw_eng_name
+                if x is not None and str(x).strip()
+            ),
+            "",
+        )
+    elif raw_eng_name is None:
+        eng_name = ""
+    else:
+        eng_name = str(raw_eng_name).strip()
+    info["product_name_english"] = eng_name
+
     raw_price = info.get("price_ils", 0)
-    # Ensure price is numeric
+    # Ensure price is numeric (LLM sometimes returns a descriptive string).
     try:
         price = float(raw_price) if raw_price else 0
     except (ValueError, TypeError):
         price = 0
+    info["price_ils"] = price
     logger.info(f"  Extracted: {eng_name} — {price} ILS")
 
     # Skip if extraction found no real product
     if not eng_name or eng_name.lower() in ("none", "error", "n/a", ""):
         logger.warning(f"  SKIP: no product name extracted")
         stats["skipped"] += 1
+        save_failure(risk_id, url, "no_product_name")
         return
     if price <= 0:
         logger.warning(f"  SKIP: no price extracted")
         stats["skipped"] += 1
+        save_failure(risk_id, url, "no_price")
         return
 
     # Search
@@ -316,6 +507,10 @@ async def process_product(client, scraper, risk_id, domain, score, url):
     result["product_name_english"] = eng_name
     result["price_ils"] = price
     save_price_match(risk_id, url, result)
+
+    # If this was a retry, clear the old failure entry
+    if RETRY_MODE:
+        clear_failure(risk_id, url)
 
     stats["processed"] += 1
     if matches:
@@ -340,8 +535,24 @@ async def process_product(client, scraper, risk_id, domain, score, url):
     logger.info(f"  Done in {elapsed:.1f}s — {time_left():.0f}s remaining")
 
 
+def log_summary():
+    elapsed = time.time() - start_time
+    logger.info(f"\n=== SUMMARY ===")
+    logger.info(f"Mode: {'retry-failures' if RETRY_MODE else 'normal'}")
+    logger.info(f"Runtime: {elapsed:.0f}s ({elapsed/60:.1f} min)")
+    logger.info(f"Processed: {stats['processed']}")
+    logger.info(f"Matched: {stats['matched']}")
+    logger.info(f"Failed: {stats['failed']}")
+    logger.info(f"Skipped: {stats['skipped']}")
+    if stats["processed"] > 0:
+        logger.info(f"Avg time/product: {elapsed/stats['processed']:.1f}s")
+        logger.info(f"Match rate: {stats['matched']/stats['processed']*100:.0f}%")
+        logger.info(f"Projected per hour: {3600/(elapsed/stats['processed']):.0f} products")
+
+
 async def main():
-    logger.info(f"=== Batch Price Match — max runtime {MAX_RUNTIME}s ===")
+    mode_str = "RETRY" if RETRY_MODE else "NORMAL"
+    logger.info(f"=== Batch Price Match [{mode_str}] — max runtime {MAX_RUNTIME}s ===")
 
     gemini_key = os.getenv("GEMINI_API_KEY")
     if not gemini_key:
@@ -349,7 +560,11 @@ async def main():
         sys.exit(1)
 
     client = genai.Client(api_key=gemini_key)
-    products = get_eligible_products()
+
+    if RETRY_MODE:
+        products = get_failed_products()
+    else:
+        products = get_eligible_products()
 
     if not products:
         logger.info("No eligible products found")
@@ -368,20 +583,8 @@ async def main():
             await process_product(client, scraper, risk_id, domain, score, url)
     finally:
         await scraper.stop()
-
-    elapsed = time.time() - start_time
-    logger.info(f"\n=== SUMMARY ===")
-    logger.info(f"Runtime: {elapsed:.0f}s ({elapsed/60:.1f} min)")
-    logger.info(f"Processed: {stats['processed']}")
-    logger.info(f"Matched: {stats['matched']}")
-    logger.info(f"Failed: {stats['failed']}")
-    logger.info(f"Skipped: {stats['skipped']}")
-    if stats["processed"] > 0:
-        logger.info(f"Avg time/product: {elapsed/stats['processed']:.1f}s")
-        logger.info(f"Match rate: {stats['matched']/stats['processed']*100:.0f}%")
-        logger.info(f"Projected per hour: {3600/(elapsed/stats['processed']):.0f} products")
-
-    send_summary_email()
+        log_summary()
+        send_summary_email()
 
 
 def send_summary_email():
@@ -396,9 +599,10 @@ def send_summary_email():
     elapsed = time.time() - start_time
     total = stats["processed"] + stats["failed"] + stats["skipped"]
     match_rate = f"{stats['matched']/stats['processed']*100:.0f}%" if stats["processed"] else "N/A"
+    mode_str = "RETRY" if RETRY_MODE else "NORMAL"
 
     body = (
-        f"=== Price Match Summary ===\n"
+        f"=== Price Match Summary [{mode_str}] ===\n"
         f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
         f"Runtime: {elapsed/60:.1f} min\n\n"
         f"Total attempted: {total}\n"
@@ -414,7 +618,7 @@ def send_summary_email():
         for domain, product, markup, price_ils, price_usd in sorted(top_markups, key=lambda x: x[2], reverse=True)[:3]:
             body += f"  {domain}: {product[:40]} — {markup:.1f}x (₪{price_ils} vs ${price_usd})\n"
 
-    subject = f"Adora Price Match: {stats['matched']}/{stats['processed']} matched ({match_rate})"
+    subject = f"Adora Price Match [{mode_str}]: {stats['matched']}/{stats['processed']} matched ({match_rate})"
 
     try:
         msg = MIMEMultipart()

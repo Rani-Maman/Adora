@@ -34,9 +34,10 @@ echo "[$(date -Is)] Log: ${LOG_FILE}"
 
 set +e
 timeout --signal=TERM "${MAX_RUNTIME}" \
-  "${PYTHON_BIN}" "${REPO_ROOT}/backend/scripts/batch_price_match.py" \
+  "${PYTHON_BIN}" "${SCRIPT_DIR}/batch_price_match.py" \
     --max-runtime "${MAX_RUNTIME}" \
     --dotenv-path "${DOTENV_PATH}" \
+    "$@" \
   2>&1 | tee -a "${LOG_FILE}"
 status=${PIPESTATUS[0]}
 

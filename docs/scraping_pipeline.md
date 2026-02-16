@@ -146,7 +146,7 @@ batch_analyze_ads.py (cron: */10)
         ├── UPDATE ads_with_urls SET analysis_score = $score
         ├── INSERT INTO dropship_analysis (detailed structured result)
         ├── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
-        └── If borderline (0.45–0.55): append to review_queue.txt
+        └── If borderline (0.45–0.59): append to review_queue.txt
 ```
 
 ### Score Ranges
@@ -160,7 +160,7 @@ batch_analyze_ads.py (cron: */10)
 
 ### Review Workflow
 
-Borderline sites (score 0.45–0.55 with "dropship" category) are appended to `review_queue.txt`. The interactive CLI tool `review_tool.py` triages them:
+Borderline sites (score 0.45–0.59) are appended to `review_queue.txt`. The interactive CLI tool `review_tool.py` triages them:
 
 ```
 review_tool.py
@@ -254,21 +254,33 @@ Runs at **07:01** daily via `run_price_match.sh` (flock, max 110 min runtime). S
 ### Flow
 
 ```
-run_price_match.sh (cron: 07:01 daily)
+run_price_match.sh (cron: 07:01–12:01 hourly, retry at 06:01)
   ├── flock (prevent concurrent runs)
-  ├── Load .env via grep (avoids source .env issues)
-  └── python3 batch_price_match.py --max-runtime 6600
-        ├── Query risk_db for all risky domains
-        ├── For each domain:
-        │     ├── Scrape product pages → extract product names + ILS prices
-        │     ├── For each product:
-        │     │     ├── Gemini 2.0 Flash + Google Search grounding
-        │     │     ├── Search: "product name AliExpress/Temu/Alibaba price USD"
-        │     │     └── Parse: [{source, title, price_usd, url, match_type}]
-        │     └── Store matches in price_matches JSONB column
-        ├── Send email summary (match rate, top markups)
+  ├── Load .env, forward extra args ($@) to python
+  └── python3 batch_price_match.py --max-runtime 6600 [--retry-failures]
+        ├── Pre-filter: skip known-bad URL patterns (t.me, minisite.ms, bit.ly, etc)
+        ├── Query risk_db for eligible products (excludes already matched + failed)
+        │   (--retry-failures: query price_match_failures instead)
+        ├── For each product:
+        │     ├── Playwright scrape (45s timeout, networkidle fallback if <200 chars)
+        │     ├── Gemini extract: Hebrew page → English product name + ILS price
+        │     ├── Gemini search (grounded): AliExpress/Temu/Alibaba alternatives
+        │     │     └── On parse fail: retry strict prompt → regex fallback
+        │     ├── On success: save to price_matches JSONB, clear failure if retry
+        │     └── On failure: save to price_match_failures JSONB with reason
+        ├── Send email summary (always, via finally block)
         └── Log to /home/ubuntu/adora_ops/logs/price_match/
 ```
+
+### Failure Tracking
+
+Failed products are tracked in `risk_db.price_match_failures` JSONB with reason codes:
+- `url_pattern_filtered` — known non-product URL (t.me, link shorteners, collection pages)
+- `scrape_empty` — Playwright got no text (JS-heavy, bot-blocked, dead page)
+- `extraction_failed` — Gemini couldn't parse product info
+- `no_product_name` / `no_price` — page has no real product data
+
+Failed URLs are excluded from normal runs. `--retry-failures` re-processes them (clears on success).
 
 ### Price Match Data Format (JSONB)
 
@@ -330,7 +342,8 @@ run_price_match.sh (cron: 07:01 daily)
 │ full_response    │    │ risk_score        │
 │ domain, flags    │    │ evidence[]        │
 │ confidence       │    │ price_matches JSON│
-│ analyzed_at      │    │ first/last_updated│
+│ analyzed_at      │    │ pm_failures  JSON│
+│                  │    │ first/last_updated│
 └──────────────────┘    └───────────────────┘
                                ▲
                                │ /check/?url=
@@ -435,8 +448,9 @@ User navigates to URL
 | `03:00` | `04_shaot.json` | Scrape keyword: שעות |
 | `04:00` | `05_achshav.json` | Scrape keyword: עכשיו |
 | `05:00` | `nightly_scrape_summary.py` | Combined scrape results email |
-| `07:01` | `run_price_match.sh` | Batch price matching via Gemini grounding (max 110 min) |
-| `*/10 9-23` | `batch_analyze_ads.py` | Analyze 20 unscored ads (Playwright + Gemini) |
+| `06:01` | `run_price_match.sh --retry-failures` | Retry previously failed price matches |
+| `07:01–12:01` | `run_price_match.sh` | Hourly batch price matching (max 110 min each) |
+| `*/10 13-23` | `batch_analyze_ads.py` | Analyze 20 unscored ads (Playwright + Gemini) |
 | `23:00` | `batch_analyze_daily_summary.py` | Daily analysis summary email |
 
 ---
@@ -463,7 +477,7 @@ User navigates to URL
 
 2. ANALYZE (every 10 min, batch of 20)
    ads_with_urls (unscored) → Playwright site scrape → Gemini AI → dropship_analysis + risk_db
-   Borderline scores (0.45–0.55) → review_queue.txt → review_tool.py → risk_db or legit
+   Borderline scores (0.45–0.59) → review_queue.txt → review_tool.py → risk_db or legit
 
 3. PRICE MATCH (daily at 07:01)
    risk_db (risky domains) → batch_price_match.py → Gemini 2.0 Flash with grounding
