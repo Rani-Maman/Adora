@@ -331,6 +331,16 @@ STRONG DROPSHIP SIGNALS (each adds 0.2-0.3):
 - No real contact beyond WhatsApp/email
 - Terms of Service / About page admits: third-party suppliers, dropshipping, shipping from China/overseas, products sourced externally, AliExpress/Alibaba fulfillment
 
+AUTOMATIC LOW SCORE (0.0-0.1) — NOT physical products, cannot be dropshipped:
+- Restaurants, cafes, food delivery, catering
+- Services (cleaning, repairs, consulting, coaching, therapy)
+- Courses, workshops, online education, webinars
+- Flights, travel packages, hotels, tours
+- Software, SaaS, apps, subscriptions
+- Real estate, rentals
+- Events, tickets, experiences
+If the site sells any of the above, score 0.0-0.1 regardless of other signals.
+
 LEGITIMATE SIGNALS (each subtracts 0.1-0.2):
 - Real Israeli business with address + VAT/registration number
 - Genuine review platform (Google, Trustpilot, embedded widget)
@@ -338,7 +348,6 @@ LEGITIMATE SIGNALS (each subtracts 0.1-0.2):
 - Professional brand with history, social media presence
 - Physical store or studio mentioned
 - Handmade / artisan / custom-made product (pre-order + longer shipping is normal for creators — do NOT penalize single-product stores if the product appears original/handmade, not mass-produced AliExpress goods)
-- Digital product / course / service (score 0.0)
 
 DATA:
 URL: {site.url}
