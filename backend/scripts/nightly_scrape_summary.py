@@ -439,14 +439,6 @@ def main():
     )
     send_email(subject, report_with_path)
 
-    # Reset dispatch mode so batch_analyze picks up new ads
-    try:
-        with open("/tmp/adora_mode", "w") as f:
-            f.write("analyze")
-        logger.info("Dispatch mode reset to analyze")
-    except Exception:
-        pass
-
 
 if __name__ == "__main__":
     main()

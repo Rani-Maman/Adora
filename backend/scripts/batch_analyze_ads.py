@@ -566,12 +566,7 @@ async def main():
         logger.info(f"Fetched {len(ads)} ads.")
 
         if not ads:
-            logger.info("No unscored ads — switching to price_match mode")
-            try:
-                with open("/tmp/adora_mode", "w") as f:
-                    f.write("price_match")
-            except Exception as e:
-                logger.warning(f"Failed to write mode file: {e}")
+            logger.info("No unscored ads.")
             return
 
         for ad_id, url in ads:

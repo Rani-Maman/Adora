@@ -451,20 +451,21 @@ User navigates to URL
 | `05:00` | `nightly_scrape_summary.py` | Combined scrape results email + reset dispatch mode to `analyze` |
 | `06:01` | `run_price_match.sh --retry-failures` | Retry previously failed price matches |
 | `07:01–12:01` | `run_price_match.sh` | Hourly batch price matching (max 110 min each) |
-| `*/10 13-23` | `run_batch_dispatch.sh` | Dispatcher: analyze ads if pending, else price match until midnight |
+| `*/10 13-23` | `run_batch_dispatch.sh` | Dispatcher: queries both queues, runs whichever has work |
 | `23:00` | `batch_analyze_daily_summary.py` | Daily analysis summary email |
 
-### Dispatch Mode (`/tmp/adora_mode`)
+### Dispatcher (`run_batch_dispatch.sh`)
 
-The */10 cron uses a dispatcher that reads `/tmp/adora_mode`:
-- `analyze` (default): runs `batch_analyze_ads.py` to score unscored ads
-- `price_match`: runs `run_price_match.sh` for price matching
+Each */10 cron tick, the dispatcher queries the DB for both queue sizes:
+- **Unscored ads** (`ads_with_urls WHERE analysis_score IS NULL`)
+- **Eligible price match products** (risk_db domains with dropship ads, no existing match/failure)
 
-Mode switches automatically:
-- **analyze → price_match**: when `batch_analyze_ads.py` finds 0 unscored ads
-- **price_match → analyze**: when `nightly_scrape_summary.py` runs (05:00, after new ads scraped)
+Priority: analyze > price_match > nothing.
+- If unscored ads > 0 → run `batch_analyze_ads.py`
+- Else if eligible products > 0 → run `run_price_match.sh`
+- Else → exit (nothing to do)
 
-Price match flock prevents overlap with morning price_match crons. VM reboot resets to `analyze` (file in /tmp).
+Price match flock prevents overlap with morning price_match crons.
 
 ---
 
