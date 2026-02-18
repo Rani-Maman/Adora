@@ -182,8 +182,15 @@ class SiteScraper:
             return False
     
     async def scrape(self, url: str) -> SiteData:
+        try:
+            return await asyncio.wait_for(self._scrape(url), timeout=90)
+        except asyncio.TimeoutError:
+            logger.warning(f"Scrape timeout (90s): {url[:80]}")
+            return SiteData(url=url, error="Scrape timeout (90s)")
+
+    async def _scrape(self, url: str) -> SiteData:
         data = SiteData(url=url)
-        
+
         # Check if browser is alive, restart if not
         if not await self.is_browser_alive():
             try:
@@ -191,7 +198,7 @@ class SiteScraper:
             except Exception as e:
                 data.error = f"Browser restart failed: {e}"
                 return data
-        
+
         context = None
         try:
             # Create a new context (lighter than new browser)

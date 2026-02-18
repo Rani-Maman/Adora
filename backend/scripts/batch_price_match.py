@@ -253,6 +253,13 @@ class SiteScraper:
 
     async def scrape(self, url: str) -> str:
         """Scrape page text. Follows CTA links on advertorial pages."""
+        try:
+            return await asyncio.wait_for(self._scrape(url), timeout=90)
+        except asyncio.TimeoutError:
+            logger.warning(f"Scrape timeout (90s): {url[:80]}")
+            return ""
+
+    async def _scrape(self, url: str) -> str:
         if not self.browser:
             await self.restart()
 
