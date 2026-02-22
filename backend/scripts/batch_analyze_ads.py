@@ -252,18 +252,31 @@ class SiteScraper:
 
                 # If no price found (listicle/landing/advertorial page), follow product link
                 if not data.product_price:
-                    # Try /products/ links first, then CTA buttons
-                    product_links = await page.eval_on_selector_all(
-                        'a[href*="/products/"]',
-                        'els => els.map(e => e.href)'
-                    )
+                    # Try stripping advertorial suffix first (e.g. /Product/adv → /Product/)
+                    product_links = []
+                    adv_suffixes = ['/adv', '/advertorial', '/landing', '/adv-', '/lp']
+                    cur_url = page.url.rstrip('/')
+                    for suffix in adv_suffixes:
+                        if cur_url.lower().endswith(suffix):
+                            base = cur_url[:len(cur_url) - len(suffix)] + '/'
+                            if base:
+                                product_links = [base]
+                            break
+
+                    # Try /products/ links
+                    if not product_links:
+                        product_links = await page.eval_on_selector_all(
+                            'a[href*="/products/"]',
+                            'els => els.map(e => e.href)'
+                        )
                     if not product_links:
                         # Look for CTA buttons on advertorial/funnel pages
                         try:
                             cta = await page.evaluate("""() => {
                                 var links = Array.from(document.querySelectorAll("a[href]"));
-                                var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours/i;
-                                var productRe = /\\/products\\/|\\/product\\/|checkout|cart|shop/i;
+                                var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours|לפרטים נוספים|להזמנה עכשיו|לצפייה במוצר|למוצר/i;
+                                var productRe = /\\/products?\\/|\\/order/i;
+                                var badRe = /\\/(cart|policy|terms|privacy|contact|about|faq|return|shipping)\\/?$/i;
                                 var curPath = location.pathname;
                                 var curHost = location.hostname;
                                 for (var i = 0; i < links.length; i++) {
@@ -274,6 +287,7 @@ class SiteScraper:
                                     try {
                                         var u = new URL(href);
                                         if (u.pathname === curPath && u.hostname === curHost) continue;
+                                        if (badRe.test(u.pathname)) continue;
                                         if (ctaRe.test(t) && href.indexOf("http") === 0) return href;
                                         if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) return href;
                                     } catch(e) {}

@@ -127,14 +127,14 @@ def get_failed_products():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        SELECT r.id, r.base_url, r.risk_score, f->>'url' as product_url
+        SELECT DISTINCT ON (f->>'url') r.id, r.base_url, r.risk_score, f->>'url' as product_url
         FROM risk_db r,
              jsonb_array_elements(COALESCE(r.price_match_failures, '[]'::jsonb)) f
         WHERE r.risk_score >= 0.6
         AND r.base_url NOT LIKE '%%shein.com'
         AND r.base_url NOT LIKE '%%aliexpress.com'
         AND r.base_url NOT LIKE '%%temu.%%'
-        ORDER BY r.risk_score DESC
+        ORDER BY f->>'url', r.risk_score DESC
     """)
     rows = cur.fetchall()
     cur.close()
@@ -253,17 +253,35 @@ class SiteScraper:
         await asyncio.sleep(1)
         await self.start()
 
-    async def scrape(self, url: str) -> str:
-        """Scrape page text. Follows CTA links on advertorial pages."""
+    async def scrape(self, url: str) -> tuple[str, bytes | None]:
+        """Scrape page text + screenshot. Follows CTA links on advertorial pages."""
         try:
             return await asyncio.wait_for(self._scrape(url), timeout=90)
         except asyncio.TimeoutError:
             logger.warning(f"Scrape timeout (90s): {url[:80]}")
-            return ""
+            return "", None
 
-    async def _scrape(self, url: str) -> str:
+    async def _scrape(self, url: str) -> tuple[str, bytes | None]:
         if not self.browser:
             await self.restart()
+
+        price_re = re.compile(r'[₪]\s*(\d[\d,\.]+)|(\d[\d,\.]+)\s*[₪]')
+
+        async def _extract_css_price(p) -> str | None:
+            """Try common CSS selectors for price elements."""
+            try:
+                return await p.evaluate("""() => {
+                    var sels = ['.price', '[data-price]', '.product-price',
+                        '.woocommerce-Price-amount', '[class*="price"]',
+                        '[class*="Price"]', '.product__price', '.current-price'];
+                    for (var s of sels) {
+                        var el = document.querySelector(s);
+                        if (el && el.textContent.trim()) return el.textContent.trim();
+                    }
+                    return null;
+                }""")
+            except Exception:
+                return None
 
         context = None
         try:
@@ -281,52 +299,114 @@ class SiteScraper:
                 except Exception:
                     pass  # keep whatever we got from first attempt
 
+            # CSS price extraction on landing page
+            css_price = await _extract_css_price(page)
+            if css_price:
+                text += f"\n[PRICE_ELEMENT]: {css_price}"
+
+            # Screenshot target — default to original page, upgrade to product page
+            screenshot_page = page
+
+            # Try stripping advertorial suffix to find product page
+            # e.g. /ProstaNova/adv → /ProstaNova/
+            adv_suffixes = ['/adv', '/advertorial', '/landing', '/adv-', '/lp']
+            cur_url = page.url.rstrip('/')
+            found_product_page = False
+            prod_page_ref = None
+            for suffix in adv_suffixes:
+                if cur_url.lower().endswith(suffix):
+                    base = cur_url[:len(cur_url) - len(suffix)] + '/'
+                    if base and base != cur_url:
+                        try:
+                            prod_page = await context.new_page()
+                            await prod_page.goto(base, wait_until="domcontentloaded", timeout=20000)
+                            await prod_page.wait_for_timeout(3000)
+                            prod_text = await prod_page.inner_text("body")
+                            if prod_text.strip() and len(prod_text.strip()) > 200:
+                                logger.info(f"  Following adv→product: {base[:80]}")
+                                text += "\n[PRODUCT PAGE]\n" + prod_text[:4000]
+                                # CSS price on product page
+                                pp_css = await _extract_css_price(prod_page)
+                                if pp_css:
+                                    text += f"\n[PRICE_ELEMENT]: {pp_css}"
+                                screenshot_page = prod_page
+                                prod_page_ref = prod_page  # keep open for screenshot
+                                found_product_page = True
+                            else:
+                                logger.info(f"  Adv→product page too short: {base[:80]}")
+                                await prod_page.close()
+                        except Exception as e:
+                            logger.warning(f"  Adv→product failed: {e}")
+                    break
+
             # Follow CTA links on advertorial/funnel pages to find the product
-            # These pages have a fake article with a CTA button linking to the real product
+            if not found_product_page:
+                try:
+                    cta_url = await page.evaluate("""() => {
+                        var links = Array.from(document.querySelectorAll("a[href]"));
+                        var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours|לפרטים נוספים|להזמנה עכשיו|לצפייה במוצר|למוצר/i;
+                        var productRe = /\\/products?\\/|\\/order/i;
+                        var badRe = /\\/(cart|policy|terms|privacy|contact|about|faq|return|shipping)\\/?$/i;
+                        var curPath = location.pathname;
+                        var curHost = location.hostname;
+                        for (var i = 0; i < links.length; i++) {
+                            var a = links[i];
+                            var t = (a.innerText || "").trim();
+                            var href = a.href || "";
+                            if (!href || href.indexOf("javascript:") === 0) continue;
+                            try {
+                                var u = new URL(href);
+                                if (u.pathname === curPath && u.hostname === curHost) continue;
+                                if (badRe.test(u.pathname)) continue;
+                                if (ctaRe.test(t) && href.indexOf("http") === 0) return href;
+                                if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) return href;
+                            } catch(e) {}
+                        }
+                        return null;
+                    }""")
+                    if cta_url:
+                        logger.info(f"  Following CTA link: {cta_url[:80]}")
+                        prod_page = await context.new_page()
+                        try:
+                            await prod_page.goto(cta_url, wait_until="domcontentloaded", timeout=30000)
+                            await prod_page.wait_for_timeout(3000)
+                            prod_text = await prod_page.inner_text("body")
+                            if prod_text.strip():
+                                text += "\n[PRODUCT PAGE]\n" + prod_text[:4000]
+                                # CSS price on CTA target page
+                                cta_css = await _extract_css_price(prod_page)
+                                if cta_css:
+                                    text += f"\n[PRICE_ELEMENT]: {cta_css}"
+                                screenshot_page = prod_page
+                                prod_page_ref = prod_page  # keep open for screenshot
+                        except Exception:
+                            await prod_page.close()
+                except Exception:
+                    pass
+
+            # Regex price extraction on assembled text
+            m = price_re.search(text)
+            if m:
+                raw = (m.group(1) or m.group(2)).replace(',', '')
+                text = f"[PRICE_HINT: ₪{raw}]\n" + text
+
+            # Screenshot the best page (product page if found, else landing)
+            screenshot = None
             try:
-                cta_url = await page.evaluate("""() => {
-                    var links = Array.from(document.querySelectorAll("a[href]"));
-                    var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours/i;
-                    var productRe = /\\/products\\/|\\/product\\/|checkout|cart|shop/i;
-                    var curPath = location.pathname;
-                    var curHost = location.hostname;
-                    for (var i = 0; i < links.length; i++) {
-                        var a = links[i];
-                        var t = (a.innerText || "").trim();
-                        var href = a.href || "";
-                        if (!href || href.indexOf("javascript:") === 0) continue;
-                        try {
-                            var u = new URL(href);
-                            // Skip same-page anchors
-                            if (u.pathname === curPath && u.hostname === curHost) continue;
-                            // Match by CTA text
-                            if (ctaRe.test(t) && href.indexOf("http") === 0) return href;
-                            // Match by product URL pattern on same domain
-                            if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) return href;
-                        } catch(e) {}
-                    }
-                    return null;
-                }""")
-                if cta_url:
-                    logger.info(f"  Following CTA link: {cta_url[:80]}")
-                    prod_page = await context.new_page()
-                    try:
-                        await prod_page.goto(cta_url, wait_until="domcontentloaded", timeout=30000)
-                        await prod_page.wait_for_timeout(3000)
-                        prod_text = await prod_page.inner_text("body")
-                        if prod_text.strip():
-                            text += "\n[PRODUCT PAGE]\n" + prod_text[:4000]
-                    except Exception:
-                        pass
-                    finally:
-                        await prod_page.close()
+                screenshot = await screenshot_page.screenshot(type="jpeg", quality=50, full_page=False)
             except Exception:
                 pass
+            # Close product page if we kept it open for screenshot
+            if prod_page_ref and prod_page_ref != page:
+                try:
+                    await prod_page_ref.close()
+                except Exception:
+                    pass
 
-            return text[:8000]
+            return text[:8000], screenshot
         except Exception as e:
             logger.warning(f"Scrape failed {url}: {e}")
-            return ""
+            return "", None
         finally:
             if context:
                 try:
@@ -353,7 +433,9 @@ async def extract_product_info(client, page_text: str) -> dict | None:
     prompt = (
         "Analyze this Israeli product page text and extract product details.\n"
         "Translate the product name to generic English search terms (not brand name).\n"
-        "Hebrew names won't work on AliExpress — use descriptive English.\n\n"
+        "Hebrew names won't work on AliExpress — use descriptive English.\n"
+        "Look for price in [PRICE_HINT], [PRICE_ELEMENT] tags, ₪ symbols, "
+        "or 'מחיר'/'price' labels. price_ils MUST be > 0 if any price is visible.\n\n"
         f"Page text:\n{page_text}\n\n"
         "Return ONLY valid JSON:\n"
         '{"product_name_hebrew": "original", "product_name_english": "english terms", '
@@ -485,6 +567,34 @@ async def search_cheaper(client, product_info: dict) -> dict:
         return {"matches": [], "no_match_reason": str(e)}
 
 
+async def extract_price_from_screenshot(client, screenshot: bytes) -> float:
+    """Send page screenshot to Gemini to visually extract the price."""
+    if not screenshot:
+        return 0
+    try:
+        resp = await client.aio.models.generate_content(
+            model=MODEL,
+            contents=[
+                types.Part.from_bytes(data=screenshot, mime_type="image/jpeg"),
+                "Look at this product page screenshot. "
+                "What is the price shown in ILS (₪)? "
+                "Return ONLY JSON: {\"price_ils\": 0.0} "
+                "If no price visible, return {\"price_ils\": 0}"
+            ]
+        )
+        await asyncio.sleep(GEMINI_CALL_DELAY)
+        result = parse_json(resp.text)
+        if result:
+            raw = result.get("price_ils", 0)
+            try:
+                return float(raw) if raw else 0
+            except (ValueError, TypeError):
+                return 0
+    except Exception as e:
+        logger.warning(f"  Screenshot price extraction failed: {e}")
+    return 0
+
+
 async def process_product(client, scraper, risk_id, domain, score, url):
     """Full pipeline for one product."""
     t0 = time.time()
@@ -498,7 +608,7 @@ async def process_product(client, scraper, risk_id, domain, score, url):
         return
 
     # Scrape
-    page_text = await scraper.scrape(url)
+    page_text, screenshot = await scraper.scrape(url)
     if not page_text:
         logger.warning(f"  SKIP: no page text")
         stats["skipped"] += 1
@@ -545,8 +655,14 @@ async def process_product(client, scraper, risk_id, domain, score, url):
         stats["skipped"] += 1
         save_failure(risk_id, url, "no_product_name")
         return
+    if price <= 0 and screenshot:
+        # Try visual price extraction from screenshot
+        price = await extract_price_from_screenshot(client, screenshot)
+        info["price_ils"] = price
+        if price > 0:
+            logger.info(f"  Price from screenshot: {price} ILS")
     if price <= 0:
-        logger.warning(f"  SKIP: no price extracted")
+        logger.info(f"  SKIP: no price found after all attempts")
         stats["skipped"] += 1
         save_failure(risk_id, url, "no_price")
         return
