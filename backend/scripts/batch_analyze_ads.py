@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright, Browser
 from google import genai
+from google.genai import types
 import psycopg2
 from psycopg2.extras import Json
 
@@ -39,7 +40,7 @@ if not GEMINI_KEY:
 BATCH_SIZE = 10  # Reduced for 956MB RAM VM
 GEMINI_RETRY_ATTEMPTS = 3
 GEMINI_BASE_DELAY = 2  # seconds
-GEMINI_CALL_DELAY = 2  # seconds between API calls - reduces rate to ~3 calls/min
+GEMINI_CALL_DELAY = 4  # seconds between API calls — grounded 2.5-flash needs more time
 LOCK_FILE = "/tmp/batch_analyze.lock"  # Prevent concurrent cron runs
 
 # --- Whitelist (known legit domains — skip analysis entirely) ---
@@ -352,37 +353,42 @@ class GeminiScorer:
         if not self.client:
              return {"score": 0.0, "reason": "No API Key", "is_risky": False}
 
-        prompt = f"""You are an Israeli e-commerce fraud detector. Identify DROPSHIP/SCAM stores vs legitimate businesses.
+        prompt = f"""You are an Israeli e-commerce fraud detector with web search access. Determine if this site is a DROPSHIP/SCAM store or a legitimate business.
 
-STRONG DROPSHIP SIGNALS (each adds 0.2-0.3):
-- Reviews shown as WhatsApp/Messenger/chat screenshots instead of real review system
-- No physical address, registration number, or real business identity
-- Product easily found on AliExpress/Temu/Alibaba (gadgets, bowls, beauty tools, pet items, posture braces, etc.)
-- AI-generated product images (too perfect, floating objects, unrealistic lighting)
-- Price is 3-6x the typical AliExpress price for the same product category (use your knowledge of AliExpress pricing to evaluate — if the product is the type commonly sold on AliExpress and the Israeli price suggests a typical dropship markup, add 0.2-0.3)
-- Heavy urgency: countdown timers, "מבצע", "מוגבל", "רק היום", scarcity widgets
-- Single product or very narrow SKU range
-- Fake "handmade" or "Israeli-made" claims for obvious AliExpress goods
-- No real contact beyond WhatsApp/email
-- Terms of Service / About page admits: third-party suppliers, dropshipping, shipping from China/overseas, products sourced externally, AliExpress/Alibaba fulfillment
+USE YOUR SEARCH TOOLS to verify:
+1. Search for the business name — does it have real Google reviews, social media, news mentions?
+2. Search for the product name on AliExpress/Temu — is it the same product at 3-6x markup?
+3. If the site claims a physical address or business registration (ח.פ.), verify it exists
 
-AUTOMATIC LOW SCORE (0.0-0.1) — NOT physical products, cannot be dropshipped:
-- Restaurants, cafes, food delivery, catering
-- Services (cleaning, repairs, consulting, coaching, therapy)
-- Courses, workshops, online education, webinars
-- Flights, travel packages, hotels, tours
-- Software, SaaS, apps, subscriptions
-- Real estate, rentals
-- Events, tickets, experiences
-If the site sells any of the above, score 0.0-0.1 regardless of other signals.
+SCORING RULES:
 
-LEGITIMATE SIGNALS (each subtracts 0.1-0.2):
-- Real Israeli business with address + VAT/registration number
-- Genuine review platform (Google, Trustpilot, embedded widget)
-- Unique product not available on AliExpress
-- Professional brand with history, social media presence
-- Physical store or studio mentioned
-- Handmade / artisan / custom-made product (pre-order + longer shipping is normal for creators — do NOT penalize single-product stores if the product appears original/handmade, not mass-produced AliExpress goods)
+DROPSHIP (score 0.7-1.0) — MUST have multiple confirmed signals:
+- Product confirmed available on AliExpress/Temu at fraction of the price
+- No verifiable business identity (no real address, no ח.פ., no Google presence)
+- TOS/About admits third-party suppliers, dropshipping, overseas fulfillment
+- Fake reviews (WhatsApp screenshots instead of real review platform)
+- Single product funnel with heavy urgency tactics
+
+LEGITIMATE (score 0.0-0.2) — any of these is strong evidence:
+- Verified Israeli business with ח.פ. number, physical address, Google Maps listing
+- Real customer reviews on Google/Trustpilot/Facebook
+- Brand has social media presence with history (not just ads)
+- Product is unique/handmade/custom — not mass-produced AliExpress goods
+- Physical store or established online brand
+
+NON-PHYSICAL / SERVICE (score 0.0) — cannot be dropshipped:
+- Restaurants, food delivery, catering
+- Services, consulting, coaching, therapy, cleaning
+- Courses, workshops, education, webinars
+- Software, SaaS, apps
+- Real estate, travel, events, tickets
+
+UNCERTAIN (score 0.3-0.5) — use ONLY when:
+- Product could be from AliExpress but you cannot confirm via search
+- Business identity is unclear but not obviously fake
+- Mixed signals that search couldn't resolve
+
+BE DECISIVE: if search confirms the product on AliExpress at a fraction of the price AND the site has no real business identity, score 0.8+. If search confirms a real business, score 0.0-0.2. Avoid the 0.4-0.6 range unless genuinely uncertain after searching.
 
 DATA:
 URL: {site.url}
@@ -394,13 +400,18 @@ Signals: Countdown={site.has_countdown_timer}, Scarcity={site.has_scarcity_widge
 Text: {site.page_text[:800]}
 {f"Terms/Policy page: {site.tos_text[:600]}" if site.tos_text else ""}
 
-Score: 0.0=legit, 0.6=borderline dropship, 0.8=clear dropship, 0.9+=scam. MUST be between 0.0 and 1.0, never negative.
-Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "str", "evidence": ["str"] }}"""
+Return JSON: {{ "score": float, "is_risky": bool, "category": "dropship|legit|service|uncertain", "reason": "str", "evidence": ["str"] }}
+Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
         
         # Retry with exponential backoff for rate limits and parse errors
         for attempt in range(GEMINI_RETRY_ATTEMPTS):
             try:
-                resp = await self.client.aio.models.generate_content(model='gemini-2.0-flash', contents=prompt)
+                grounding_config = types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())]
+                )
+                resp = await self.client.aio.models.generate_content(
+                    model='gemini-2.5-flash', contents=prompt, config=grounding_config
+                )
                 clean = re.sub(r'^```\w*\n?|```$', '', resp.text.strip())
                 match = re.search(r'\{[\s\S]*\}', clean)
                 if not match:
@@ -415,6 +426,20 @@ Return JSON: {{ "score": float, "is_risky": bool, "category": "str", "reason": "
                     fixed = re.sub(r':\s*"([^"]*)"([^",}\]]*)"', r': "\1\2"', fixed)
                     result = json.loads(fixed)
                 result['score'] = max(0.0, min(1.0, float(result.get('score', 0))))
+
+                # Normalize category to enum
+                valid_cats = {"dropship", "legit", "service", "uncertain"}
+                raw_cat = result.get("category", "uncertain").lower().strip()
+                if raw_cat not in valid_cats:
+                    if "dropship" in raw_cat or "scam" in raw_cat:
+                        raw_cat = "dropship"
+                    elif any(k in raw_cat for k in ("service", "restaurant", "course", "saas", "event", "travel", "real estate", "software", "digital")):
+                        raw_cat = "service"
+                    elif any(k in raw_cat for k in ("legit", "legitimate", "brand")):
+                        raw_cat = "legit"
+                    else:
+                        raw_cat = "uncertain"
+                result["category"] = raw_cat
 
                 # Small delay between successful calls to avoid rate limits
                 await asyncio.sleep(GEMINI_CALL_DELAY)
@@ -499,9 +524,6 @@ def update_ad_result(ad_id, result):
     run_psql(sql)
 
 RISK_SCORE_THRESHOLD = 0.6
-REVIEW_QUEUE_FILE = os.getenv("REVIEW_QUEUE_FILE", "/home/ubuntu/adora_ops/review_queue.txt")
-BORDERLINE_LOW = 0.45
-BORDERLINE_HIGH = 0.6  # exclusive — everything below RISK_SCORE_THRESHOLD
 
 def upsert_risk_db(url, result):
     score = result.get('score', 0)
@@ -525,34 +547,6 @@ def upsert_risk_db(url, result):
     """
     run_psql(sql)
 
-
-def append_review_queue(url, result):
-    """Append borderline sites (0.45-0.59) to review_queue.txt for manual triage."""
-    score = result.get('score', 0)
-    if not (BORDERLINE_LOW <= score < BORDERLINE_HIGH):
-        return
-
-    from urllib.parse import urlparse
-    domain = urlparse(url).netloc.replace('www.', '')
-    reason = result.get('reason', '')[:200]
-
-    # Dedup: skip if domain already in file
-    try:
-        if os.path.isfile(REVIEW_QUEUE_FILE):
-            with open(REVIEW_QUEUE_FILE, 'r', encoding='utf-8') as f:
-                existing = f.read()
-            if domain in existing:
-                return
-    except Exception:
-        pass
-
-    line = f"{domain} | score={score:.2f} | {reason}\n"
-    try:
-        with open(REVIEW_QUEUE_FILE, 'a', encoding='utf-8') as f:
-            f.write(line)
-        logger.info(f"  -> review queue: {domain} (score={score:.2f})")
-    except Exception as e:
-        logger.warning(f"Failed to write review queue: {e}")
 
 
 # --- Main ---
@@ -596,7 +590,6 @@ async def main():
             
             update_ad_result(ad_id, res)
             upsert_risk_db(url, res)
-            append_review_queue(url, res)
     finally:
         # Always clean up browser
         await scraper.stop()

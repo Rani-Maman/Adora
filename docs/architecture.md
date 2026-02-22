@@ -84,22 +84,17 @@ stateDiagram-v2
     Fetching --> Analyzing: Content Ready
     
     state Analyzing {
-        [*] --> CheckPhysicalProduct
-        CheckPhysicalProduct --> Skip: Not Physical
-        CheckPhysicalProduct --> DetectRedFlags: Is Physical
-        DetectRedFlags --> ScoreRisk
-        ScoreRisk --> SearchAliExpress
-        SearchAliExpress --> ComparePrice
-        ComparePrice --> CalculateFinal
-        CalculateFinal --> [*]
-        Skip --> [*]
+        [*] --> SendToGemini: Gemini 2.5 Flash + Grounding
+        SendToGemini --> ParseResult
+        ParseResult --> NormalizeCategory
+        NormalizeCategory --> [*]
     }
     
     Analyzing --> Storing: Score Calculated
     
     state Storing {
-        [*] --> SaveToDropshipAnalysis
-        SaveToDropshipAnalysis --> CheckThreshold
+        [*] --> UpdateAdsWithUrls
+        UpdateAdsWithUrls --> CheckThreshold
         CheckThreshold --> AddToRiskDB: Score >= Threshold
         CheckThreshold --> Done: Score < Threshold
         AddToRiskDB --> Done
@@ -189,12 +184,10 @@ stateDiagram-v2
     
     state "advertisers" as ADV
     state "ads_with_urls" as ADS
-    state "dropship_analysis" as DA
     state "risk_db" as RISK
 
     [*] --> ADV: Scraper Inserts
     ADV --> ADS: Filter Valid URLs
-    ADS --> DA: Analysis Complete
-    DA --> RISK: Score >= Threshold
+    ADS --> RISK: Score >= Threshold
     RISK --> [*]: Extension Queries
 ```

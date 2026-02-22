@@ -1,5 +1,5 @@
 -- Adora DB schema (PostgreSQL 14)
--- 6 tables: scraping pipeline → analysis pipeline → extension lookup
+-- 5 tables: scraping pipeline → analysis pipeline → extension lookup
 
 -- ============================================================
 -- 1. meta_ads_daily — all scraped ads, deduped by unique key
@@ -77,38 +77,7 @@ CREATE TABLE IF NOT EXISTS ads_with_urls (
 CREATE INDEX IF NOT EXISTS idx_ads_with_urls_scraped_at ON ads_with_urls(scraped_at);
 
 -- ============================================================
--- 5. dropship_analysis — detailed Gemini analysis per product URL
--- ============================================================
-CREATE TABLE IF NOT EXISTS dropship_analysis (
-    id SERIAL PRIMARY KEY,
-    advertiser_name TEXT,
-    destination_product_url TEXT UNIQUE,
-    full_response JSONB,
-    domain TEXT,
-    page_type TEXT,
-    brand_name TEXT,
-    currency TEXT,
-    shipping_days_max INTEGER,
-    return_window_days INTEGER,
-    has_email BOOLEAN,
-    has_phone BOOLEAN,
-    has_address BOOLEAN,
-    has_legal_name BOOLEAN,
-    has_business_id BOOLEAN,
-    reviews_present BOOLEAN,
-    review_count INTEGER,
-    average_rating DOUBLE PRECISION,
-    long_shipping_time_flag BOOLEAN,
-    missing_business_identity_flag BOOLEAN,
-    policy_boilerplate_flag BOOLEAN,
-    single_product_funnel_flag BOOLEAN,
-    scrape_status TEXT,
-    confidence DOUBLE PRECISION,
-    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================
--- 6. risk_db — risky domains (score >= 0.6), queried by extension
+-- 5. risk_db — risky domains (score >= 0.6), queried by extension
 -- ============================================================
 CREATE TABLE IF NOT EXISTS risk_db (
     id SERIAL PRIMARY KEY,

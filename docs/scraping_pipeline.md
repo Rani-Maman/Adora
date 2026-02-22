@@ -25,7 +25,10 @@ Adora is an Israeli dropship/scam detection system. It scrapes Facebook/Meta Ad 
 │   04:00  ┌──────────────┐                                   │
 │   ──────►│ Keyword Job 5│  (achshav / עכשיו)                 │
 │          └──────────────┘                                   │
-│   05:00  ┌──────────────────────┐                           │
+│   05:00  ┌──────────────┐                                   │
+│   ──────►│ Keyword Job 6│  (mishloach_chinam / משלוח חינם)   │
+│          └──────────────┘                                   │
+│   06:00  ┌──────────────────────┐                           │
 │   ──────►│ Nightly Email Summary│  → Gmail                  │
 │          └──────────────────────┘                           │
 └─────────────────────────────────────────────────────────────┘
@@ -116,10 +119,10 @@ External URLs are extracted from ad text/links. The following are excluded:
 
 ### Architecture
 
-Every 10 minutes, `batch_analyze_ads.py` picks up **20 unscored ads** from `ads_with_urls` and runs them through a two-stage analysis:
+Every 10 minutes, `batch_analyze_ads.py` picks up **10 unscored ads** from `ads_with_urls` and runs them through a two-stage analysis:
 
 1. **Playwright Site Scrape** — Visit the advertiser's product URL, extract structured data
-2. **Gemini 2.0 Flash AI Scoring** — Send site data to Google's Gemini API for fraud analysis
+2. **Gemini 2.5 Flash AI Scoring** — Send site data to Google's Gemini API with Google Search grounding for verification-based fraud analysis
 
 ### Components
 
@@ -142,12 +145,12 @@ batch_analyze_ads.py (cron: */10)
         │     title, product_name, price, shipping_time,
         │     business_id (ח.פ.), countdown_timer, scarcity_widgets,
         │     whatsapp_only_contact, page_text (4000 chars)
-        ├── Send to Gemini 2.0 Flash with Israeli fraud detection prompt
+        ├── Send to Gemini 2.5 Flash with Google Search grounding
+        │     └── Gemini verifies: business identity, AliExpress matches, address/ח.פ.
         ├── Parse JSON response: {score, is_risky, category, reason, evidence}
-        ├── UPDATE ads_with_urls SET analysis_score = $score
-        ├── INSERT INTO dropship_analysis (detailed structured result)
-        ├── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
-        └── If borderline (0.45–0.59): append to review_queue.txt
+        ├── Normalize category to enum: dropship|legit|service|uncertain
+        ├── UPDATE ads_with_urls SET analysis_score, analysis_category, analysis_json
+        └── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
 ```
 
 ### Score Ranges
@@ -159,33 +162,22 @@ batch_analyze_ads.py (cron: */10)
 | 0.6 – 1.0 | Likely dropship / scam |
 | -1 | Scrape failure (won't be retried) |
 
-### Review Workflow
-
-Borderline sites (score 0.45–0.59) are appended to `review_queue.txt`. The interactive CLI tool `review_tool.py` triages them:
-
-```
-review_tool.py
-  ├── Load review_queue.txt entries
-  ├── Filter out already-decided domains (risk_db + review_legit.txt)
-  └── For each site:
-        r = risky  → INSERT INTO risk_db (score ≥ 0.6)
-        l = legit  → append to review_legit.txt
-        s = skip   → defer to next session
-        q = quit   → save remaining, exit
-```
-
 ### Gemini Prompt Design
 
-The Gemini prompt is tuned for Israeli e-commerce fraud:
-- Distinguishes legitimate Israeli businesses, courses, services from dropship gadgets
-- Considers: Hebrew business registration (ח.פ.), countdown timers, scarcity widgets, WhatsApp-only contact, unrealistic shipping times, generic product descriptions
-- Returns structured JSON with confidence level
+The Gemini 2.5 Flash prompt uses **Google Search grounding** for verification-based analysis:
+- Gemini searches the web to verify business identity (Google reviews, social media, ח.פ.)
+- Searches AliExpress/Temu for identical products at lower prices
+- Verifies physical addresses and business registration claims
+- Pushes for decisive scoring — avoids 0.4–0.6 range unless genuinely uncertain after search
+- Returns structured JSON: `{score, is_risky, category, reason, evidence}`
+- Category constrained to enum: `dropship`, `legit`, `service`, `uncertain`
+- Post-parse normalization maps freeform responses to the enum
 
 ### Rate Limiting
 
-- 2-second delay between Gemini API calls
+- 4-second delay between Gemini API calls (grounded calls are heavier)
 - 3 retries with exponential backoff for 429/RESOURCE_EXHAUSTED errors
-- 20 ads per 10-minute window = ~120 ads/hour max throughput
+- 10 ads per 10-minute window = ~30 ads/hour max throughput
 
 ---
 
@@ -193,7 +185,7 @@ The Gemini prompt is tuned for Israeli e-commerce fraud:
 
 ### Nightly Combined Email (`nightly_scrape_summary.py`)
 
-Runs at **05:00** daily, after all keyword scraping jobs complete. Sends a single email combining results from all 5 keywords.
+Runs at **06:00** daily, after all keyword scraping jobs complete. Sends a single email combining results from all 6 keywords.
 
 Data sources: DB queries (per-keyword counts) + JSON report files (runtime, selected counts). Falls back to JSON data when DB returns 0 (due to ON CONFLICT DO NOTHING not updating scraped_at for returning ads).
 
@@ -232,7 +224,7 @@ Runs at **23:00** daily. Reports on the *analysis* pipeline (not scraping):
 
 ### Price Match Report (`batch_price_match.py`)
 
-Runs at **07:01** daily via `run_price_match.sh` (flock, max 110 min runtime). Sends email with:
+Runs at **23:30** daily via `run_price_match.sh` (flock, max 110 min runtime). Sends email with:
 - Products processed/matched/skipped/failed, match rate %
 - Top 3 highest-markup finds (domain, product, markup ratio)
 - Runtime
@@ -255,7 +247,7 @@ Runs at **07:01** daily via `run_price_match.sh` (flock, max 110 min runtime). S
 ### Flow
 
 ```
-run_price_match.sh (cron: 07:01–12:01 hourly, retry at 06:01)
+run_price_match.sh (cron: 23:30, retry at 06:01)
   ├── flock (prevent concurrent runs)
   ├── Load .env, forward extra args ($@) to python
   └── python3 batch_price_match.py --max-runtime 6600 [--retry-failures]
@@ -311,7 +303,7 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
 
 ## 5. Database Schema
 
-6 tables total. Schema defined in `backend/scripts/create_tables.sql`.
+5 tables total. Schema defined in `backend/scripts/create_tables.sql`.
 
 ```
 ┌──────────────────┐    ┌────────────────────────┐
@@ -336,16 +328,16 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
                                    │ batch_analyze
                                    │ (score ≥ 0.6)
                                    ▼
-┌──────────────────┐    ┌──────────────────┐
-│ dropship_analysis│    │    risk_db         │
-│ ─────────────── │    │ ───────────────── │
-│ dest_url (UNQ)   │    │ base_url (UNQ)    │
-│ full_response    │    │ risk_score        │
-│ domain, flags    │    │ evidence[]        │
-│ confidence       │    │ price_matches JSON│
-│ analyzed_at      │    │ pm_failures  JSON│
-│                  │    │ first/last_updated│
-└──────────────────┘    └───────────────────┘
+                        ┌──────────────────┐
+                        │    risk_db         │
+                        │ ───────────────── │
+                        │ base_url (UNQ)    │
+                        │ risk_score        │
+                        │ evidence[]        │
+                        │ price_matches JSON│
+                        │ pm_failures  JSON│
+                        │ first/last_updated│
+                        └───────────────────┘
                                ▲
                                │ /check/?url=
                         ┌──────┴───────┐
@@ -361,8 +353,7 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
 | `meta_ads_daily_with_urls` | Subset with valid external URLs | `daily_meta_scrape.py` |
 | `advertisers` | Unique advertisers by name | `daily_meta_scrape.py` |
 | `ads_with_urls` | Unique ads by destination URL, scored by analysis | `daily_meta_scrape.py` + `batch_analyze_ads.py` |
-| `dropship_analysis` | Detailed Gemini analysis per product URL | `batch_analyze_ads.py` |
-| `risk_db` | Risky domains (score >= 0.6) + price_matches JSONB, queried by extension | `batch_analyze_ads.py` + `review_tool.py` + `batch_price_match.py` |
+| `risk_db` | Risky domains (score >= 0.6) + price_matches JSONB, queried by extension | `batch_analyze_ads.py` + `batch_price_match.py` |
 
 ---
 
@@ -448,11 +439,12 @@ User navigates to URL
 | `02:00` | `03_hanaha.json` | Scrape keyword: הנחת |
 | `03:00` | `04_shaot.json` | Scrape keyword: שעות |
 | `04:00` | `05_achshav.json` | Scrape keyword: עכשיו |
-| `05:00` | `nightly_scrape_summary.py` | Combined scrape results email + reset dispatch mode to `analyze` |
+| `05:00` | `06_mishloach_chinam.json` | Scrape keyword: משלוח חינם |
+| `06:00` | `nightly_scrape_summary.py` | Combined scrape results email |
 | `06:01` | `run_price_match.sh --retry-failures` | Retry previously failed price matches |
-| `07:01–12:01` | `run_price_match.sh` | Hourly batch price matching (max 110 min each) |
 | `*/10 13-23` | `run_batch_dispatch.sh` | Dispatcher: queries both queues, runs whichever has work |
 | `23:00` | `batch_analyze_daily_summary.py` | Daily analysis summary email |
+| `23:30` | `run_price_match.sh` | Batch price matching (after analysis window) |
 
 ### Dispatcher (`run_batch_dispatch.sh`)
 
@@ -476,7 +468,7 @@ Price match flock prevents overlap with morning price_match crons.
 - **Python**: 3.10 (system)
 - **Meta Scraper**: HTTP GraphQL (no browser needed)
 - **Site Analyzer**: Playwright Chromium (headless, batch_analyze only)
-- **AI**: Google Gemini 2.0 Flash
+- **AI**: Google Gemini 2.5 Flash (analysis + price match, with Google Search grounding)
 - **Email**: Gmail SMTP (App Password)
 - **Extension**: Chrome extension served locally (dev mode) or via Chrome Web Store
 - **API Tunnel**: Cloudflare tunnel (cloudflared service)
@@ -486,14 +478,14 @@ Price match flock prevents overlap with morning price_match crons.
 ## 10. End-to-End Data Flow
 
 ```
-1. SCRAPE (nightly, 5 keywords, staggered hourly)
+1. SCRAPE (nightly, 6 keywords, staggered hourly)
    Meta Ad Library GraphQL API → HTTP scraper → meta_ads_daily + meta_ads_daily_with_urls + advertisers + ads_with_urls
 
-2. ANALYZE (every 10 min, batch of 20)
-   ads_with_urls (unscored) → Playwright site scrape → Gemini AI → dropship_analysis + risk_db
-   Borderline scores (0.45–0.59) → review_queue.txt → review_tool.py → risk_db or legit
+2. ANALYZE (every 10 min, batch of 10)
+   ads_with_urls (unscored) → Playwright site scrape → Gemini 2.5 Flash (grounded) → update ads_with_urls + upsert risk_db
+   Category normalized to enum: dropship|legit|service|uncertain
 
-3. PRICE MATCH (daily at 07:01)
+3. PRICE MATCH (daily at 23:30)
    risk_db (risky domains) → batch_price_match.py → Gemini 2.0 Flash with grounding
    → Search AliExpress/Temu/Alibaba for cheaper alternatives → price_matches JSONB in risk_db
    → Email summary with match rate, top markups, runtime
@@ -503,7 +495,7 @@ Price match flock prevents overlap with morning price_match crons.
    Extension shows: risk warning, cheaper alternatives (multi-source), markup badges, search links
 
 5. REPORT (daily)
-   05:00 → nightly_scrape_summary.py → combined scrape email
-   07:01 → run_price_match.sh → price match email with stats + top markups
+   06:00 → nightly_scrape_summary.py → combined scrape email
+   23:30 → run_price_match.sh → price match email with stats + top markups
    23:00 → batch_analyze_daily_summary.py → analysis stats email
 ```
