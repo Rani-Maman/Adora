@@ -96,8 +96,10 @@ stateDiagram-v2
         [*] --> UpdateAdsWithUrls
         UpdateAdsWithUrls --> CheckThreshold
         CheckThreshold --> AddToRiskDB: Score >= Threshold
-        CheckThreshold --> Done: Score < Threshold
+        CheckThreshold --> RemoveFromRiskDB: Score < Threshold (re-analysis)
+        CheckThreshold --> Done: Score < Threshold (new)
         AddToRiskDB --> Done
+        RemoveFromRiskDB --> Done
         Done --> [*]
     }
     

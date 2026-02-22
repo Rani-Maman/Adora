@@ -539,14 +539,20 @@ def upsert_risk_db(url, result):
     VALUES ('{domain}', {score}, '{evidence}', NOW(), NOW())
     ON CONFLICT (base_url) 
     DO UPDATE SET
-        -- Keep the highest score ever seen for this domain. This avoids "unflagging"
-        -- due to model variability and guards against accidental threshold regressions.
-        risk_score = GREATEST(risk_db.risk_score, EXCLUDED.risk_score),
+        risk_score = EXCLUDED.risk_score,
         evidence = EXCLUDED.evidence,
         last_updated = NOW();
     """
     run_psql(sql)
 
+
+def delete_from_risk_db(url):
+    """Remove domain from risk_db when re-analysis scores below threshold."""
+    from urllib.parse import urlparse
+    domain = urlparse(url).netloc.replace('www.', '')
+    sql = f"DELETE FROM risk_db WHERE base_url = '{domain}';"
+    run_psql(sql)
+    logger.info(f"  Removed from risk_db: {domain}")
 
 
 # --- Main ---
@@ -590,6 +596,11 @@ async def main():
             
             update_ad_result(ad_id, res)
             upsert_risk_db(url, res)
+
+            # If re-analysis dropped below threshold, remove from risk_db
+            score = res.get('score', 0)
+            if score is not None and 0 <= score < RISK_SCORE_THRESHOLD:
+                delete_from_risk_db(url)
     finally:
         # Always clean up browser
         await scraper.stop()

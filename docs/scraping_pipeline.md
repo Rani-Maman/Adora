@@ -150,7 +150,8 @@ batch_analyze_ads.py (cron: */10)
         ├── Parse JSON response: {score, is_risky, category, reason, evidence}
         ├── Normalize category to enum: dropship|legit|service|uncertain
         ├── UPDATE ads_with_urls SET analysis_score, analysis_category, analysis_json
-        └── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
+        ├── If is_risky: UPSERT INTO risk_db (domain, score, evidence)
+        └── If re-analysis scored < 0.6: DELETE from risk_db (clean false positives)
 ```
 
 ### Score Ranges
@@ -484,6 +485,7 @@ Price match flock prevents overlap with morning price_match crons.
 2. ANALYZE (every 10 min, batch of 10)
    ads_with_urls (unscored) → Playwright site scrape → Gemini 2.5 Flash (grounded) → update ads_with_urls + upsert risk_db
    Category normalized to enum: dropship|legit|service|uncertain
+   Re-analysis: if score drops below 0.6 → DELETE from risk_db (latest score replaces old)
 
 3. PRICE MATCH (daily at 23:30)
    risk_db (risky domains) → batch_price_match.py → Gemini 2.0 Flash with grounding
