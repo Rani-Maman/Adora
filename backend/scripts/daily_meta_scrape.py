@@ -102,6 +102,7 @@ SHORTENER_HOSTS = {
     "rb.gy",
     # Common in Israel
     "katzr.net",
+    "did.li",
 }
 
 

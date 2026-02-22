@@ -79,6 +79,9 @@ SKIP_URL_PATTERNS = [
     r'^https?://(?:www\.)?youtube\.com/',      # YouTube (video platform)
     r'^https?://(?:www\.)?youtu\.be/',
     r'^https?://temu\.to/',                    # Temu affiliate redirects (hangs Playwright)
+    r'^https?://did\.li/',                      # URL shortener
+    r'^https?://bit\.ly/',                      # URL shortener
+    r'^https?://tinyurl\.com/',                 # URL shortener
     r'^https?://(?:\w+\.)?shein\.com/',          # Shein (legit marketplace)
     r'^https?://(?:\w+\.)?aliexpress\.com/',     # AliExpress (legit marketplace)
     r'^https?://s\.click\.aliexpress\.com/',     # AliExpress affiliate links
@@ -491,6 +494,9 @@ def fetch_unscored_ads(limit=10):
       AND destination_product_url NOT LIKE '%youtu.be%'
       AND destination_product_url NOT LIKE '%linktr.ee%'
       AND destination_product_url NOT LIKE '%docs.google.com%'
+      AND destination_product_url NOT LIKE '%did.li%'
+      AND destination_product_url NOT LIKE '%bit.ly%'
+      AND destination_product_url NOT LIKE '%tinyurl.com%'
       AND LENGTH(destination_product_url) > 15
     LIMIT {limit};"""
     res = run_psql(sql)
@@ -550,8 +556,11 @@ def delete_from_risk_db(url):
     """Remove domain from risk_db when re-analysis scores below threshold."""
     from urllib.parse import urlparse
     domain = urlparse(url).netloc.replace('www.', '')
-    sql = f"DELETE FROM risk_db WHERE base_url = '{domain}';"
-    run_psql(sql)
+    # Check if domain exists before deleting to avoid noisy logs
+    check = run_psql(f"SELECT 1 FROM risk_db WHERE base_url = '{domain}' LIMIT 1;")
+    if not check.stdout.strip():
+        return
+    run_psql(f"DELETE FROM risk_db WHERE base_url = '{domain}';")
     logger.info(f"  Removed from risk_db: {domain}")
 
 

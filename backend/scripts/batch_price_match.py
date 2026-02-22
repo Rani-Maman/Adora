@@ -60,6 +60,8 @@ BAD_URL_PATTERNS = [
     r"^https?://[^/]*urlgeni\.us/",
     r"^https?://[^/]*ravpage\.co\.il/",
     r"^https?://[^/]*bit\.ly/",
+    r"^https?://[^/]*did\.li/",
+    r"^https?://[^/]*tinyurl\.com/",
     r"^https?://[^/]*linktr\.ee/",
     r"/collections/?$",
     r"/product-category/?$",
