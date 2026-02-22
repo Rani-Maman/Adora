@@ -356,7 +356,7 @@ class GeminiScorer:
         if not self.client:
              return {"score": 0.0, "reason": "No API Key", "is_risky": False}
 
-        prompt = f"""You are an Israeli e-commerce fraud detector with web search access. Determine if this site is a DROPSHIP/SCAM store or a legitimate business.
+        prompt = f"""You are an Israeli e-commerce fraud detector with web search access. Your ONLY goal is to identify sites selling PHYSICAL PRODUCTS that are dropshipped from AliExpress/Temu at inflated prices. If the site does NOT sell a physical product, it is NOT relevant — score 0.0 as service.
 
 USE YOUR SEARCH TOOLS to verify:
 1. Search for the business name — does it have real Google reviews, social media, news mentions?
@@ -379,12 +379,15 @@ LEGITIMATE (score 0.0-0.2) — any of these is strong evidence:
 - Product is unique/handmade/custom — not mass-produced AliExpress goods
 - Physical store or established online brand
 
-NON-PHYSICAL / SERVICE (score 0.0) — cannot be dropshipped:
+NON-PHYSICAL / SERVICE (score 0.0) — NOT a physical product, cannot be dropshipped:
+- Any service: therapy, fitness, consulting, coaching, cleaning, personal training, healthcare, physiotherapy
 - Restaurants, food delivery, catering
-- Services, consulting, coaching, therapy, cleaning
 - Courses, workshops, education, webinars
-- Software, SaaS, apps
+- Software, SaaS, apps, bots, chatbots
 - Real estate, travel, events, tickets
+- Community groups, WhatsApp/Telegram groups, deal aggregators, coupon sites
+- Pages with no physical product (newsletters, sign-up pages, portfolios, landing pages for services)
+  NOTE: advertorial/lead pages that link TO a physical product are NOT service — score based on that product
 
 UNCERTAIN (score 0.3-0.5) — use ONLY when:
 - Product could be from AliExpress but you cannot confirm via search
@@ -532,8 +535,8 @@ def update_ad_result(ad_id, result):
 RISK_SCORE_THRESHOLD = 0.6
 
 def upsert_risk_db(url, result):
-    score = result.get('score', 0)
-    if score < RISK_SCORE_THRESHOLD: return
+    score = result.get('score')
+    if score is None or score < RISK_SCORE_THRESHOLD: return
     
     from urllib.parse import urlparse
     domain = urlparse(url).netloc.replace('www.', '')
@@ -607,7 +610,7 @@ async def main():
             upsert_risk_db(url, res)
 
             # If re-analysis dropped below threshold, remove from risk_db
-            score = res.get('score', 0)
+            score = res.get('score')
             if score is not None and 0 <= score < RISK_SCORE_THRESHOLD:
                 delete_from_risk_db(url)
     finally:
