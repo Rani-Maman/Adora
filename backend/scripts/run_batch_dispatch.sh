@@ -11,7 +11,7 @@ DB_USER="ubuntu"
 UNSCORED=$(psql -U "$DB_USER" -d "$DB_NAME" -t -c \
   "SELECT COUNT(*) FROM ads_with_urls WHERE analysis_score IS NULL;" 2>/dev/null | tr -d ' ')
 
-# Count eligible price match products
+# Count eligible price match products (aligned with batch_price_match.py filters)
 ELIGIBLE=$(psql -U "$DB_USER" -d "$DB_NAME" -t -c \
   "SELECT COUNT(DISTINCT r.id) FROM risk_db r
    JOIN ads_with_urls a ON LOWER(TRIM(r.base_url)) = LOWER(TRIM(
@@ -19,6 +19,12 @@ ELIGIBLE=$(psql -U "$DB_USER" -d "$DB_NAME" -t -c \
    WHERE r.risk_score >= 0.6
    AND a.analysis_category ILIKE '%dropship%'
    AND a.destination_product_url IS NOT NULL
+   AND LENGTH(a.destination_product_url) > 20
+   AND a.destination_product_url ~ '^https?://[^/]+/.+'
+   AND r.base_url NOT LIKE '%shein.com'
+   AND r.base_url NOT LIKE '%aliexpress.com'
+   AND r.base_url NOT LIKE '%temu.%'
+   AND a.destination_product_url NOT LIKE '%s.click.aliexpress.com%'
    AND (r.price_matches IS NULL
      OR NOT r.price_matches::text LIKE '%' || a.destination_product_url || '%')
    AND (r.price_match_failures IS NULL
