@@ -119,7 +119,7 @@ External URLs are extracted from ad text/links. The following are excluded:
 
 ### Architecture
 
-Every 10 minutes, `batch_analyze_ads.py` picks up **10 unscored ads** from `ads_with_urls` and runs them through a two-stage analysis:
+Every 10 minutes, `batch_analyze_ads.py` picks up **10 unscored ads** from `ads_with_urls` and runs them through a two-stage analysis. Uses **psycopg2** for all DB writes (parameterized queries). Over-fetches 5x from SQL and filters in Python via `should_skip_url()` (skip patterns + whitelist). Skipped ads are marked `score=0.0, category='skipped'` so they don't clog the backlog.
 
 1. **Playwright Site Scrape** — Visit the advertiser's product URL, extract structured data
 2. **Gemini 2.5 Flash AI Scoring** — Send site data to Google's Gemini API with Google Search grounding for verification-based fraud analysis
@@ -136,7 +136,8 @@ Every 10 minutes, `batch_analyze_ads.py` picks up **10 unscored ads** from `ads_
 
 ```
 batch_analyze_ads.py (cron: */10)
-  ├── SELECT 20 rows FROM ads_with_urls WHERE analysis_score IS NULL
+  ├── SELECT 50 rows FROM ads_with_urls WHERE analysis_score IS NULL (5x over-fetch)
+  ├── Filter with should_skip_url() → mark skipped (score=0.0), keep up to 10
   ├── Launch single Playwright browser (reused for batch)
   └── For each ad:
         ├── Navigate to product URL
@@ -158,6 +159,7 @@ batch_analyze_ads.py (cron: */10)
 
 | Score | Meaning |
 |-------|---------|
+| 0.0 | Skipped (whitelisted/filtered URL) |
 | 0.0 – 0.2 | Legitimate business |
 | 0.3 – 0.5 | Uncertain / needs review |
 | 0.6 – 1.0 | Likely dropship / scam |
@@ -170,6 +172,7 @@ The Gemini 2.5 Flash prompt uses **Google Search grounding** for verification-ba
 - Searches AliExpress/Temu for identical products at lower prices
 - Verifies physical addresses and business registration claims
 - Pushes for decisive scoring — avoids 0.4–0.6 range unless genuinely uncertain after search
+- Legitimate bias rules: furniture/home décor (0.0-0.2), jewelry/watches (legit unless confirmed AliExpress match), sub-₪100 items (only flag generic gadgets/electronics with 3x+ markup)
 - Returns structured JSON: `{score, is_risky, category, reason, evidence}`
 - Category constrained to enum: `dropship`, `legit`, `service`, `uncertain`
 - Post-parse normalization maps freeform responses to the enum
@@ -435,7 +438,7 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
 | `meta_ads_daily_with_urls` | Subset with valid external URLs | `daily_meta_scrape.py` |
 | `advertisers` | Unique advertisers by name | `daily_meta_scrape.py` |
 | `ads_with_urls` | Unique ads by destination URL, scored by analysis | `daily_meta_scrape.py` + `batch_analyze_ads.py` |
-| `risk_db` | Risky domains (score >= 0.6) + price_matches JSONB, queried by extension | `batch_analyze_ads.py` + `batch_price_match.py` |
+| `risk_db` | Risky domains (score >= 0.6) + price_matches JSONB + advertiser_name, queried by extension | `batch_analyze_ads.py` + `batch_price_match.py` |
 
 ---
 

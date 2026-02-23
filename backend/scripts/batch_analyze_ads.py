@@ -2,14 +2,12 @@
 """
 Batch Ad Analyzer.
 Runs Playwright + Gemini Scorer on unscored ads.
-Uses subprocess + psql for DB access to avoid auth issues.
 """
 import asyncio
 import os
 import re
 import json
 import logging
-import subprocess
 import random
 import fcntl
 from datetime import datetime
@@ -86,6 +84,11 @@ SKIP_URL_PATTERNS = [
     r'^https?://(?:\w+\.)?aliexpress\.com/',     # AliExpress (legit marketplace)
     r'^https?://s\.click\.aliexpress\.com/',     # AliExpress affiliate links
     r'^https?://(?:\w+\.)?temu\.com/',           # Temu (legit marketplace)
+    r'^https?://t\.me/',                          # Telegram
+    r'^https?://[^/]*vp4\.me/',                   # Group invitations
+    r'^https?://[^/]*ravpage\.co\.il/',            # Landing page builder
+    r'^https?://[^/]*minisite\.ms/',               # Landing page builder
+    r'^https?://urlgeni\.us/',                     # URL shortener
 ]
 
 def should_skip_url(url: str) -> bool:
@@ -375,23 +378,29 @@ class GeminiScorer:
 USE YOUR SEARCH TOOLS to verify:
 1. Search for the business name — does it have real Google reviews, social media, news mentions?
 2. Search for the product name on AliExpress/Temu — is it the same product at 3-6x markup?
-3. If the site claims a physical address or business registration (ח.פ.), verify it exists
+3. If the site claims a business registration, VERIFY IT: Israeli ח.פ./ע.מ., EU VAT number, UK Companies House, US EIN/state registration, or any other country's company registry. A verified registration in ANY country counts as legitimate identity.
+4. If a company name is mentioned (e.g. in legal/about/TOS pages), search for it in the relevant country's business registry to confirm it exists.
 
 SCORING RULES:
 
 DROPSHIP (score 0.7-1.0) — MUST have multiple confirmed signals:
 - Product confirmed available on AliExpress/Temu at fraction of the price
-- No verifiable business identity (no real address, no ח.פ., no Google presence)
+- No verifiable business identity in ANY country (no registration, no real address, no Google presence)
 - TOS/About admits third-party suppliers, dropshipping, overseas fulfillment
 - Fake reviews (WhatsApp screenshots instead of real review platform)
 - Single product funnel with heavy urgency tactics
 
 LEGITIMATE (score 0.0-0.2) — any of these is strong evidence:
-- Verified Israeli business with ח.פ. number, physical address, Google Maps listing
+- Verified business registration in ANY country: Israeli ח.פ., EU VAT number, UK company, US LLC/Corp, etc.
+- Real company with verifiable address (Google Maps, company registry, government database)
 - Real customer reviews on Google/Trustpilot/Facebook
 - Brand has social media presence with history (not just ads)
 - Product is unique/handmade/custom — not mass-produced AliExpress goods
 - Physical store or established online brand
+- Furniture, chairs, tables, home décor — these are almost never dropshipped from AliExpress. Score 0.0-0.2 unless overwhelming evidence.
+- Jewelry, watches, accessories — score as legit UNLESS the exact same item is confirmed on AliExpress at a fraction of the price. Branded/artisan jewelry is NOT dropship.
+- Products priced under ₪100 — low price alone does not indicate dropship. Only flag if it's a generic gadget/electronics/accessory commonly sold on AliExpress AND the markup is significant (3x+). Food, cosmetics, local brands at low prices are NOT dropship.
+IMPORTANT: A company registered abroad (Cyprus, UK, US, etc.) selling to Israel is NOT suspicious by itself. Many legitimate businesses operate internationally. Only flag if the product itself is a generic AliExpress item at inflated prices AND no real business exists.
 
 NON-PHYSICAL / SERVICE (score 0.0) — NOT a physical product, cannot be dropshipped:
 - Any service: therapy, fitness, consulting, coaching, cleaning, personal training, healthcare, physiotherapy
@@ -451,11 +460,17 @@ Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
                 valid_cats = {"dropship", "legit", "service", "uncertain"}
                 raw_cat = result.get("category", "uncertain").lower().strip()
                 if raw_cat not in valid_cats:
-                    if "dropship" in raw_cat or "scam" in raw_cat:
+                    if "dropship" in raw_cat or "scam" in raw_cat or "fraud" in raw_cat:
                         raw_cat = "dropship"
-                    elif any(k in raw_cat for k in ("service", "restaurant", "course", "saas", "event", "travel", "real estate", "software", "digital")):
+                    elif any(k in raw_cat for k in (
+                        "service", "restaurant", "course", "saas", "event",
+                        "travel", "real estate", "software", "digital",
+                        "food", "delivery", "marketing", "consulting",
+                        "coaching", "fitness", "healthcare", "therapy",
+                        "cleaning", "education", "workshop",
+                    )):
                         raw_cat = "service"
-                    elif any(k in raw_cat for k in ("legit", "legitimate", "brand")):
+                    elif any(k in raw_cat for k in ("legit", "legitimate", "brand", "home", "kitchen", "beauty")):
                         raw_cat = "legit"
                     else:
                         raw_cat = "uncertain"
@@ -492,93 +507,117 @@ Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
 
         return {"score": None, "is_risky": False, "category": "api_error", "reason": "Max retries exceeded"}
 
-# --- DB Utilities (Subprocess) ---
-def run_psql(sql):
-    cmd = ['sudo', '-u', 'postgres', 'psql', '-d', 'firecrawl', '-t', '-P', 'format=unaligned', '-c', sql]
-    return subprocess.run(cmd, capture_output=True, text=True)
+# --- DB Utilities ---
+def get_db_conn():
+    return psycopg2.connect(host='localhost', dbname='firecrawl', user='postgres', password='')
+
+def _mark_skipped(skip_ids):
+    """Bulk-mark filtered ads as skipped so they don't clog the backlog."""
+    if not skip_ids:
+        return
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE ads_with_urls
+                SET analysis_score = 0.0, analysis_category = 'skipped',
+                    analysis_reason = 'Filtered by skip patterns or whitelist',
+                    analyzed_at = NOW()
+                WHERE id = ANY(%s) AND analysis_score IS NULL
+            """, (skip_ids,))
+        conn.commit()
+        logger.info(f"Marked {cur.rowcount} ads as skipped.")
+    finally:
+        conn.close()
 
 def fetch_unscored_ads(limit=10):
-    sql = f"""SELECT id, destination_product_url FROM ads_with_urls
-    WHERE analysis_score IS NULL
-      AND destination_product_url IS NOT NULL
-      AND destination_product_url NOT LIKE '%facebook.com%'
-      AND destination_product_url NOT LIKE '%instagram.com%'
-      AND destination_product_url NOT LIKE '%fb.com%'
-      AND destination_product_url NOT LIKE '%wa.me%'
-      AND destination_product_url NOT LIKE '%whatsapp.com%'
-      AND destination_product_url NOT LIKE '%tiktok.com%'
-      AND destination_product_url NOT LIKE '%youtube.com%'
-      AND destination_product_url NOT LIKE '%youtu.be%'
-      AND destination_product_url NOT LIKE '%linktr.ee%'
-      AND destination_product_url NOT LIKE '%docs.google.com%'
-      AND destination_product_url NOT LIKE '%did.li%'
-      AND destination_product_url NOT LIKE '%bit.ly%'
-      AND destination_product_url NOT LIKE '%tinyurl.com%'
-      AND LENGTH(destination_product_url) > 15
-    LIMIT {limit};"""
-    res = run_psql(sql)
-    ads = []
-    if res.stdout.strip():
-        for line in res.stdout.strip().split('\n'):
-            parts = line.split('|')
-            if len(parts) >= 2:
-                ads.append((parts[0], parts[1]))
-    return ads
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            # Over-fetch 5x to compensate for Python-side skip filtering
+            cur.execute("""
+                SELECT id, destination_product_url, advertiser_name
+                FROM ads_with_urls
+                WHERE analysis_score IS NULL
+                  AND destination_product_url IS NOT NULL
+                  AND LENGTH(destination_product_url) > 15
+                LIMIT %s
+            """, (limit * 5,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    # Filter with should_skip_url (single source of truth for skip patterns)
+    filtered = []
+    skip_ids = []
+    for r in rows:
+        if should_skip_url(r[1]):
+            skip_ids.append(r[0])
+        else:
+            filtered.append((r[0], r[1], r[2]))
+    _mark_skipped(skip_ids)
+    return filtered[:limit]
 
 def update_ad_result(ad_id, result):
     score = result.get('score')
-    # None score = Gemini error, leave as NULL so it gets retried
     if score is None:
         return
-    # Escape single quotes for SQL
-    reason = str(result.get('reason', '')).replace("'", "''")
-    cat = str(result.get('category', '')).replace("'", "''")
-    json_str = json.dumps(result).replace("'", "''")
-
-    sql = f"""
-    UPDATE ads_with_urls
-    SET analysis_score = {score},
-        analysis_category = '{cat}',
-        analysis_reason = '{reason}',
-        analysis_json = '{json_str}',
-        analyzed_at = NOW()
-    WHERE id = {ad_id};
-    """
-    run_psql(sql)
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE ads_with_urls
+                SET analysis_score = %s, analysis_category = %s,
+                    analysis_reason = %s, analysis_json = %s, analyzed_at = NOW()
+                WHERE id = %s
+            """, (
+                score,
+                str(result.get('category', '')),
+                str(result.get('reason', '')),
+                json.dumps(result),
+                ad_id,
+            ))
+        conn.commit()
+    finally:
+        conn.close()
 
 RISK_SCORE_THRESHOLD = 0.6
 
-def upsert_risk_db(url, result):
+def upsert_risk_db(url, result, advertiser_name=None):
     score = result.get('score')
-    if score is None or score < RISK_SCORE_THRESHOLD: return
-    
+    if score is None or score < RISK_SCORE_THRESHOLD:
+        return
     from urllib.parse import urlparse
     domain = urlparse(url).netloc.replace('www.', '')
-    score = result.get('score', 0)
-    evidence = "{" + ",".join([f'"{e}"' for e in result.get('evidence', [])]) + "}"
-    
-    sql = f"""
-    INSERT INTO risk_db (base_url, risk_score, evidence, first_seen, last_updated)
-    VALUES ('{domain}', {score}, '{evidence}', NOW(), NOW())
-    ON CONFLICT (base_url) 
-    DO UPDATE SET
-        risk_score = EXCLUDED.risk_score,
-        evidence = EXCLUDED.evidence,
-        last_updated = NOW();
-    """
-    run_psql(sql)
-
+    evidence = result.get('evidence', [])
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO risk_db (base_url, risk_score, evidence, advertiser_name, first_seen, last_updated)
+                VALUES (%s, %s, %s, %s, NOW(), NOW())
+                ON CONFLICT (base_url) DO UPDATE SET
+                    risk_score = EXCLUDED.risk_score,
+                    evidence = EXCLUDED.evidence,
+                    advertiser_name = COALESCE(EXCLUDED.advertiser_name, risk_db.advertiser_name),
+                    last_updated = NOW()
+            """, (domain, score, evidence, advertiser_name))
+        conn.commit()
+    finally:
+        conn.close()
 
 def delete_from_risk_db(url):
     """Remove domain from risk_db when re-analysis scores below threshold."""
     from urllib.parse import urlparse
     domain = urlparse(url).netloc.replace('www.', '')
-    # Check if domain exists before deleting to avoid noisy logs
-    check = run_psql(f"SELECT 1 FROM risk_db WHERE base_url = '{domain}' LIMIT 1;")
-    if not check.stdout.strip():
-        return
-    run_psql(f"DELETE FROM risk_db WHERE base_url = '{domain}';")
-    logger.info(f"  Removed from risk_db: {domain}")
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM risk_db WHERE base_url = %s", (domain,))
+            if cur.rowcount > 0:
+                logger.info(f"  Removed from risk_db: {domain}")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # --- Main ---
@@ -602,12 +641,11 @@ async def main():
             logger.info("No unscored ads.")
             return
 
-        for ad_id, url in ads:
+        for ad_id, url, adv_name in ads:
             logger.info(f"[{ad_id}] Processing {url[:80]}...")
             site = await scraper.scrape(url)
             if site.error:
                 logger.warning(f"Scrape Error: {site.error[:100]}")
-                # Mark as analyzed with score=-1 to indicate scrape failure
                 update_ad_result(ad_id, {
                     'score': -1,
                     'category': 'scrape_error',
@@ -616,12 +654,12 @@ async def main():
                     'evidence': []
                 })
                 continue
-                
+
             res = await scorer.score(site)
             logger.info(f"  -> {res.get('category')} ({res.get('score')})")
-            
+
             update_ad_result(ad_id, res)
-            upsert_risk_db(url, res)
+            upsert_risk_db(url, res, adv_name)
 
             # If re-analysis dropped below threshold, remove from risk_db
             score = res.get('score')
