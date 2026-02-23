@@ -63,6 +63,8 @@ BAD_URL_PATTERNS = [
     r"^https?://[^/]*did\.li/",
     r"^https?://[^/]*tinyurl\.com/",
     r"^https?://[^/]*linktr\.ee/",
+    r"^https?://[^/]*vp4\.me/",
+    r"/click\?key=",
     r"/collections/?$",
     r"/product-category/?$",
     r"/categories/?$",
@@ -283,6 +285,31 @@ class SiteScraper:
             except Exception:
                 return None
 
+        async def _extract_price_region(p) -> str:
+            """Extract text near price elements + bottom of page."""
+            try:
+                return await p.evaluate("""() => {
+                    var parts = [];
+                    var priceEls = document.querySelectorAll(
+                        '[class*="price"],[class*="Price"],[data-price],.product-price,.woocommerce-Price-amount'
+                    );
+                    for (var el of priceEls) {
+                        var parent = el.closest('section,div,article') || el.parentElement;
+                        if (parent) parts.push(parent.innerText.substring(0, 500));
+                    }
+                    var allText = document.body.innerText || "";
+                    var shekelIdx = allText.indexOf('\u20aa');
+                    if (shekelIdx > -1) {
+                        parts.push(allText.substring(Math.max(0, shekelIdx - 200), shekelIdx + 200));
+                    }
+                    if (allText.length > 2000) {
+                        parts.push(allText.substring(allText.length - 2000));
+                    }
+                    return parts.join('\\n---\\n').substring(0, 3000);
+                }""")
+            except Exception:
+                return ""
+
         context = None
         try:
             context = await self.browser.new_context()
@@ -321,14 +348,19 @@ class SiteScraper:
                             prod_page = await context.new_page()
                             await prod_page.goto(base, wait_until="domcontentloaded", timeout=20000)
                             await prod_page.wait_for_timeout(3000)
+                            await prod_page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            await prod_page.wait_for_timeout(1500)
                             prod_text = await prod_page.inner_text("body")
                             if prod_text.strip() and len(prod_text.strip()) > 200:
                                 logger.info(f"  Following adv→product: {base[:80]}")
-                                text += "\n[PRODUCT PAGE]\n" + prod_text[:4000]
+                                text += "\n[PRODUCT PAGE]\n" + prod_text[:6000]
                                 # CSS price on product page
                                 pp_css = await _extract_css_price(prod_page)
                                 if pp_css:
                                     text += f"\n[PRICE_ELEMENT]: {pp_css}"
+                                price_region = await _extract_price_region(prod_page)
+                                if price_region:
+                                    text += f"\n[PRICE_REGION]\n{price_region}"
                                 screenshot_page = prod_page
                                 prod_page_ref = prod_page  # keep open for screenshot
                                 found_product_page = True
@@ -342,13 +374,16 @@ class SiteScraper:
             # Follow CTA links on advertorial/funnel pages to find the product
             if not found_product_page:
                 try:
-                    cta_url = await page.evaluate("""() => {
+                    cta_result = await page.evaluate("""() => {
                         var links = Array.from(document.querySelectorAll("a[href]"));
-                        var ctaRe = /לרכישה|הזמינו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנו|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours|לפרטים נוספים|להזמנה עכשיו|לצפייה במוצר|למוצר/i;
+                        var ctaRe = /לרכישה|הזמינו עכשיו|הזמינו|הזמן עכשיו|הזמן|לרכוש|בדיקת זמינות|קבלו|להזמנה|קנה עכשיו|קנה|קנו|לקנייה|הוסף לסל|add.to.cart|buy.now|order.now|shop.now|get.yours|לפרטים נוספים|להזמנה עכשיו|לצפייה במוצר|למוצר|אני רוצה|רוצה להזמין|בדקי|בדוק|צפה|צפו/i;
                         var productRe = /\\/products?\\/|\\/order/i;
                         var badRe = /\\/(cart|policy|terms|privacy|contact|about|faq|return|shipping)\\/?$/i;
                         var curPath = location.pathname;
                         var curHost = location.hostname;
+                        var results = [];
+                        var anchors = [];
+                        var seen = new Set();
                         for (var i = 0; i < links.length; i++) {
                             var a = links[i];
                             var t = (a.innerText || "").trim();
@@ -356,31 +391,137 @@ class SiteScraper:
                             if (!href || href.indexOf("javascript:") === 0) continue;
                             try {
                                 var u = new URL(href);
-                                if (u.pathname === curPath && u.hostname === curHost) continue;
+                                if (u.pathname === curPath && u.hostname === curHost) {
+                                    if (u.hash && /next|order|checkout|buy|step/i.test(u.hash)) {
+                                        anchors.push(href);
+                                    }
+                                    continue;
+                                }
                                 if (badRe.test(u.pathname)) continue;
-                                if (ctaRe.test(t) && href.indexOf("http") === 0) return href;
-                                if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) return href;
+                                if (seen.has(u.pathname)) continue;
+                                if (ctaRe.test(t) && href.indexOf("http") === 0) {
+                                    seen.add(u.pathname);
+                                    results.push(href);
+                                } else if (u.hostname.indexOf(curHost.replace("www.","")) > -1 && productRe.test(u.pathname)) {
+                                    seen.add(u.pathname);
+                                    results.push(href);
+                                }
                             } catch(e) {}
                         }
-                        return null;
+                        return {urls: results.slice(0, 5), anchors: anchors.slice(0, 3)};
                     }""")
-                    if cta_url:
+                    cta_urls = cta_result.get("urls", []) if cta_result else []
+                    anchor_urls = cta_result.get("anchors", []) if cta_result else []
+
+                    # Try CTA links — iterate until one has a price
+                    for cta_url in cta_urls:
                         logger.info(f"  Following CTA link: {cta_url[:80]}")
                         prod_page = await context.new_page()
                         try:
                             await prod_page.goto(cta_url, wait_until="domcontentloaded", timeout=30000)
                             await prod_page.wait_for_timeout(3000)
+                            await prod_page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            await prod_page.wait_for_timeout(1500)
                             prod_text = await prod_page.inner_text("body")
                             if prod_text.strip():
-                                text += "\n[PRODUCT PAGE]\n" + prod_text[:4000]
-                                # CSS price on CTA target page
-                                cta_css = await _extract_css_price(prod_page)
-                                if cta_css:
-                                    text += f"\n[PRICE_ELEMENT]: {cta_css}"
-                                screenshot_page = prod_page
-                                prod_page_ref = prod_page  # keep open for screenshot
+                                has_price = bool(price_re.search(prod_text)) or '\u20aa' in prod_text
+                                if has_price or not found_product_page:
+                                    if found_product_page:
+                                        # Replace previous no-price product page
+                                        # Remove old [PRODUCT PAGE] section
+                                        idx = text.find("\n[PRODUCT PAGE]\n")
+                                        if idx > -1:
+                                            text = text[:idx]
+                                    text += "\n[PRODUCT PAGE]\n" + prod_text[:6000]
+                                    cta_css = await _extract_css_price(prod_page)
+                                    if cta_css:
+                                        text += f"\n[PRICE_ELEMENT]: {cta_css}"
+                                    pr = await _extract_price_region(prod_page)
+                                    if pr:
+                                        text += f"\n[PRICE_REGION]\n{pr}"
+                                    # Close previous prod_page_ref if different
+                                    if prod_page_ref and prod_page_ref != page:
+                                        try:
+                                            await prod_page_ref.close()
+                                        except Exception:
+                                            pass
+                                    screenshot_page = prod_page
+                                    prod_page_ref = prod_page
+                                    found_product_page = True
+                                    if has_price:
+                                        logger.info(f"  Found price on CTA page")
+                                        break
+                                else:
+                                    await prod_page.close()
                         except Exception:
-                            await prod_page.close()
+                            try:
+                                await prod_page.close()
+                            except Exception:
+                                pass
+
+                    # Try #next-step anchors if still no price
+                    if not found_product_page and anchor_urls:
+                        for anchor in anchor_urls:
+                            try:
+                                logger.info(f"  Clicking anchor: {anchor[:80]}")
+                                await page.evaluate(f"document.querySelector('a[href*=\"#next\"]')?.click()")
+                                await page.wait_for_timeout(4000)
+                                new_text = await page.inner_text("body")
+                                if '\u20aa' in new_text and '\u20aa' not in text:
+                                    text += "\n[AFTER_ANCHOR]\n" + new_text[:4000]
+                                    logger.info(f"  Found price after anchor click")
+                                    break
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+            # Fallback: if page was 404/empty and no product page found, try homepage
+            if not found_product_page and len(text.strip()) < 200:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    homepage = f"{parsed.scheme}://{parsed.netloc}/"
+                    if homepage.rstrip('/') != page.url.rstrip('/'):
+                        logger.info(f"  Fallback to homepage: {homepage[:80]}")
+                        hp_page = await context.new_page()
+                        await hp_page.goto(homepage, wait_until="domcontentloaded", timeout=20000)
+                        await hp_page.wait_for_timeout(3000)
+                        await hp_page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await hp_page.wait_for_timeout(1500)
+                        hp_text = await hp_page.inner_text("body")
+                        if hp_text.strip() and len(hp_text.strip()) > 200:
+                            text += "\n[HOMEPAGE]\n" + hp_text[:6000]
+                            hp_css = await _extract_css_price(hp_page)
+                            if hp_css:
+                                text += f"\n[PRICE_ELEMENT]: {hp_css}"
+                            price_region = await _extract_price_region(hp_page)
+                            if price_region:
+                                text += f"\n[PRICE_REGION]\n{price_region}"
+                            screenshot_page = hp_page
+                            prod_page_ref = hp_page
+                        else:
+                            await hp_page.close()
+                except Exception as e:
+                    logger.warning(f"  Homepage fallback failed: {e}")
+
+            # If no price found yet, try clicking CTA buttons (not links)
+            if not price_re.search(text):
+                try:
+                    target = screenshot_page  # use best page so far
+                    btns = await target.query_selector_all('button, [role="button"], input[type="submit"]')
+                    cta_btn_re = re.compile(r'קנה|הזמינו|הזמן|לרכוש|הוסף לסל|הוסף להזמנה|buy|order|add.to.cart', re.IGNORECASE)
+                    for btn in btns[:25]:
+                        btn_text = (await btn.inner_text()).strip()
+                        if cta_btn_re.search(btn_text):
+                            logger.info(f"  Clicking CTA button: {btn_text[:40]}")
+                            await btn.click()
+                            await target.wait_for_timeout(3000)
+                            new_text = await target.inner_text("body")
+                            if '\u20aa' in new_text:
+                                text += "\n[AFTER_CLICK]\n" + new_text[:4000]
+                                logger.info(f"  Found price after button click")
+                            break
                 except Exception:
                     pass
 
@@ -403,7 +544,7 @@ class SiteScraper:
                 except Exception:
                     pass
 
-            return text[:8000], screenshot
+            return text[:12000], screenshot
         except Exception as e:
             logger.warning(f"Scrape failed {url}: {e}")
             return "", None

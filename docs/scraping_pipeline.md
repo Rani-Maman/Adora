@@ -225,7 +225,7 @@ Runs at **23:00** daily. Reports on the *analysis* pipeline (not scraping):
 
 ### Price Match Report (`batch_price_match.py`)
 
-Runs at **23:30** daily via `run_price_match.sh` (flock, max 110 min runtime). Sends email with:
+Runs at **23:30** daily via `run_price_match.sh` (flock, max 30 min runtime to finish before 00:01 scraper). Sends email with:
 - Products processed/matched/skipped/failed, match rate %
 - Top 3 highest-markup finds (domain, product, markup ratio)
 - Runtime
@@ -236,14 +236,14 @@ Runs at **23:30** daily via `run_price_match.sh` (flock, max 110 min runtime). S
 
 ### Architecture
 
-`batch_price_match.py` uses **Gemini 2.0 Flash with Google Search grounding** to find cheaper alternatives for products on risky sites. It queries all domains in `risk_db`, scrapes their product pages for names and ILS prices, then asks Gemini to search AliExpress, Temu, Alibaba, and other wholesale platforms for matching products.
+`batch_price_match.py` uses **Gemini 2.5 Flash with Google Search grounding** to find cheaper alternatives for products on risky sites. It queries all domains in `risk_db`, scrapes their product pages for names and ILS prices, then asks Gemini to search AliExpress, Temu, Alibaba, and other wholesale platforms for matching products.
 
 ### Components
 
 | File | Role |
 |------|------|
 | `backend/scripts/batch_price_match.py` | Main batch processor + email summary |
-| `backend/scripts/run_price_match.sh` | Cron wrapper with flock, env loading, logging |
+| `backend/scripts/run_price_match.sh` | Cron wrapper with flock, env loading, logging (max runtime 1800s) |
 
 ### Flow
 
@@ -251,14 +251,16 @@ Runs at **23:30** daily via `run_price_match.sh` (flock, max 110 min runtime). S
 run_price_match.sh (cron: 23:30, retry at 06:01)
   ├── flock (prevent concurrent runs)
   ├── Load .env, forward extra args ($@) to python
-  └── python3 batch_price_match.py --max-runtime 6600 [--retry-failures]
-        ├── Pre-filter: skip known-bad URL patterns (t.me, minisite.ms, bit.ly, etc)
+  └── python3 batch_price_match.py --max-runtime 1800 [--retry-failures]
+        ├── Pre-filter: skip known-bad URL patterns
         ├── Query risk_db for eligible products (excludes already matched + failed)
-        │   (--retry-failures: query price_match_failures instead)
+        │   (--retry-failures: query price_match_failures with DISTINCT ON dedup)
         ├── For each product:
-        │     ├── Playwright scrape (45s timeout, networkidle fallback if <200 chars)
+        │     ├── SiteScraper.scrape() → (text, screenshot)
         │     ├── Gemini extract: Hebrew page → English product name + ILS price
-        │     ├── Gemini search (grounded): AliExpress/Temu/Alibaba alternatives
+        │     │     └── Prompt looks for [PRICE_HINT], [PRICE_ELEMENT] tags
+        │     ├── Screenshot fallback: Gemini visual price extraction
+        │     ├── If price > 0: Gemini search (grounded) → AliExpress/Temu/Alibaba
         │     │     └── On parse fail: retry strict prompt → regex fallback
         │     ├── On success: save to price_matches JSONB, clear failure if retry
         │     └── On failure: save to price_match_failures JSONB with reason
@@ -266,15 +268,94 @@ run_price_match.sh (cron: 23:30, retry at 06:01)
         └── Log to /home/ubuntu/adora_ops/logs/price_match/
 ```
 
+### SiteScraper — Price Extraction Cascade
+
+The scraper uses a multi-layered approach to find product prices on advertorial/funnel pages:
+
+```
+SiteScraper.scrape(url) → (text[:12000], screenshot)
+  │
+  ├── 1. Load page (domcontentloaded, 5s wait)
+  │     └── If <200 chars: retry with networkidle
+  │
+  ├── 2. CSS price selectors on landing page
+  │     (.price, [data-price], .product-price, .woocommerce-Price-amount,
+  │      [class*="price"], [class*="Price"], .product__price, .current-price)
+  │     → Appends [PRICE_ELEMENT] tag
+  │
+  ├── 3. Advertorial suffix stripping
+  │     /adv, /advertorial, /landing, /adv-, /lp → strip to parent URL
+  │     Navigate to product page, scroll to bottom, extract text (6000 chars)
+  │     + CSS price + price-region extraction + screenshot of product page
+  │
+  ├── 4. Multi-CTA link following (up to 5 unique links)
+  │     JS evaluates all <a> elements for CTA text or /products/ path matches
+  │     Iterates links until one has a ₪ price — replaces previous no-price page
+  │     Also collects #next-step anchor links for step 5
+  │     + CSS price + price-region extraction + screenshot of product page
+  │
+  │     CTA text patterns (Hebrew + English):
+  │       לרכישה, הזמינו עכשיו, הזמינו, הזמן עכשיו, הזמן, לרכוש,
+  │       בדיקת זמינות, קבלו, להזמנה, קנה עכשיו, קנה, קנו, לקנייה,
+  │       הוסף לסל, למוצר, לפרטים נוספים, להזמנה עכשיו, לצפייה במוצר,
+  │       אני רוצה, רוצה להזמין, בדקי, בדוק, צפה, צפו,
+  │       add to cart, buy now, order now, shop now, get yours
+  │
+  │     Product path regex: /products?/ or /order
+  │     Bad path filter: /cart, /policy, /terms, /privacy, /contact, /about, /faq, /return, /shipping
+  │
+  ├── 5. #next-step anchor clicks (up to 3)
+  │     Same-page anchors with hash matching: next, order, checkout, buy, step
+  │     Clicks anchor on original page, waits 4s, re-extracts body text
+  │     → Appends [AFTER_ANCHOR] if ₪ newly appears
+  │
+  ├── 6. Homepage fallback (if page <200 chars and no CTA found)
+  │     Navigate to root domain, scroll, extract text + CSS + price-region + screenshot
+  │     → Appends [HOMEPAGE] tag
+  │
+  ├── 7. CTA button clicks (if still no ₪ in text)
+  │     Finds <button>, [role="button"], input[type="submit"] (up to 25)
+  │     Matches: קנה, הזמינו, הזמן, לרכוש, הוסף לסל, הוסף להזמנה, buy, order
+  │     Clicks first match, waits 3s, re-extracts body text
+  │     → Appends [AFTER_CLICK] if ₪ found (checkout drawer/popup)
+  │
+  ├── 8. Regex price extraction on assembled text
+  │     Pattern: ₪\s*(\d[\d,\.]+) or (\d[\d,\.]+)\s*₪
+  │     → Prepends [PRICE_HINT: ₪NNN] tag for LLM
+  │
+  └── 9. Screenshot (JPEG, quality=50, viewport only)
+        Targets best page: product page > homepage > landing page
+        Used for Gemini visual price extraction fallback
+```
+
+### Price-Region Extraction
+
+JS helper that extracts text near price elements + bottom of page (for advertorial pages where price is at the bottom):
+- Text around `[class*="price"]`, `[data-price]` elements (500 chars each)
+- 400-char window around first ₪ symbol occurrence
+- Bottom 2000 chars of page body
+- Returns up to 3000 chars as `[PRICE_REGION]` tag
+
+### BAD_URL_PATTERNS (pre-filter)
+
+URLs matching these patterns are immediately skipped as `url_pattern_filtered`:
+- Telegram: `t.me`
+- Landing page builders: `minisite.ms`, `ravpage.co.il`
+- URL shorteners: `bit.ly`, `did.li`, `tinyurl.com`, `urlgeni.us`, `linktr.ee`
+- Group invitations: `vp4.me`
+- Click trackers: `/click?key=`
+- Category pages: `/collections`, `/product-category`, `/categories` (trailing)
+
 ### Failure Tracking
 
 Failed products are tracked in `risk_db.price_match_failures` JSONB with reason codes:
-- `url_pattern_filtered` — known non-product URL (t.me, link shorteners, collection pages)
-- `scrape_empty` — Playwright got no text (JS-heavy, bot-blocked, dead page)
-- `extraction_failed` — Gemini couldn't parse product info
-- `no_product_name` / `no_price` — page has no real product data
+- `url_pattern_filtered` — known non-product URL (see BAD_URL_PATTERNS)
+- `scrape_empty` — Playwright got no text (JS-only render, bot-blocked, dead page)
+- `extraction_failed` — Gemini couldn't parse product info from page text
+- `no_product_name` — page has no identifiable product
+- `no_price` — all 9 price extraction steps failed to find an ILS price
 
-Failed URLs are excluded from normal runs. `--retry-failures` re-processes them (clears on success).
+Failed URLs are excluded from normal runs. `--retry-failures` re-processes them with `DISTINCT ON` dedup (prevents same URL being retried from multiple failure entries).
 
 ### Price Match Data Format (JSONB)
 
@@ -487,10 +568,10 @@ Price match flock prevents overlap with morning price_match crons.
    Category normalized to enum: dropship|legit|service|uncertain
    Re-analysis: if score drops below 0.6 → DELETE from risk_db (latest score replaces old)
 
-3. PRICE MATCH (daily at 23:30)
-   risk_db (risky domains) → batch_price_match.py → Gemini 2.0 Flash with grounding
-   → Search AliExpress/Temu/Alibaba for cheaper alternatives → price_matches JSONB in risk_db
-   → Email summary with match rate, top markups, runtime
+3. PRICE MATCH (daily at 23:30, retry at 06:01)
+   risk_db (risky domains) → batch_price_match.py → Playwright scrape (multi-layer price extraction)
+   → Gemini 2.5 Flash extract product info → Gemini 2.5 Flash (grounded) search AliExpress/Temu/Alibaba
+   → price_matches JSONB in risk_db → Email summary with match rate, top markups, runtime
 
 4. SERVE (real-time)
    Chrome Extension → FastAPI /check → risk_db (score + price_matches) → banner + popup
