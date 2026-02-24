@@ -17,7 +17,7 @@ ELIGIBLE=$(psql -U "$DB_USER" -d "$DB_NAME" -t -c \
    JOIN ads_with_urls a ON LOWER(TRIM(r.base_url)) = LOWER(TRIM(
      REPLACE(SPLIT_PART(a.destination_product_url, '/', 3), 'www.', '')))
    WHERE r.risk_score >= 0.6
-   AND a.analysis_category ILIKE '%dropship%'
+   AND (a.analysis_category ILIKE '%dropship%' OR a.analysis_category ILIKE '%uncertain%')
    AND a.destination_product_url IS NOT NULL
    AND LENGTH(a.destination_product_url) > 20
    AND a.destination_product_url ~ '^https?://[^/]+/.+'
