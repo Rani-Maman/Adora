@@ -107,6 +107,9 @@ def should_skip_url(url: str) -> bool:
         domain = urlparse(url).netloc.lower().removeprefix('www.')
         if domain in WHITELIST_DOMAINS:
             return True
+        # Blanket-skip non-profit TLDs (never e-commerce)
+        if domain.endswith('.org.il'):
+            return True
         # Check parent domain (e.g. shop.example.com → example.com)
         parts = domain.split('.')
         for i in range(1, len(parts) - 1):
@@ -490,8 +493,7 @@ Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
                     await asyncio.sleep(GEMINI_CALL_DELAY)
                     continue
                 logger.error(f"Gemini parse error after {GEMINI_RETRY_ATTEMPTS} attempts: {e}")
-                # Return None score so ad stays unscored and gets retried next batch
-                return {"score": None, "is_risky": False, "category": "parse_error", "reason": str(e)}
+                return {"score": -1, "is_risky": False, "category": "parse_error", "reason": str(e)}
 
             except Exception as e:
                 error_str = str(e)
