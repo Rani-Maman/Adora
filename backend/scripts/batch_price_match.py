@@ -267,7 +267,11 @@ class SiteScraper:
         if not self.browser:
             await self.restart()
 
-        price_re = re.compile(r'[₪]\s*(\d[\d,\.]+)|(\d[\d,\.]+)\s*[₪]')
+        price_re = re.compile(r'[₪]\s*(\d[\d,\.]+)|(\d[\d,\.]+)\s*(?:[₪]|ש"ח|שח|NIS|ILS)', re.IGNORECASE)
+
+        def _has_price(t):
+            """Check if text contains any ILS price indicator."""
+            return bool(price_re.search(t)) or '₪' in t or 'NIS' in t or 'ILS' in t or 'ש"ח' in t or 'שח' in t
 
         async def _extract_css_price(p) -> str | None:
             """Try common CSS selectors for price elements."""
@@ -298,9 +302,13 @@ class SiteScraper:
                         if (parent) parts.push(parent.innerText.substring(0, 500));
                     }
                     var allText = document.body.innerText || "";
-                    var shekelIdx = allText.indexOf('\u20aa');
-                    if (shekelIdx > -1) {
-                        parts.push(allText.substring(Math.max(0, shekelIdx - 200), shekelIdx + 200));
+                    var priceIndicators = ['\u20aa', 'NIS', 'ILS', '\u05e9"\u05d7', '\u05e9\u05d7'];
+                    for (var pi of priceIndicators) {
+                        var idx = allText.indexOf(pi);
+                        if (idx > -1) {
+                            parts.push(allText.substring(Math.max(0, idx - 200), idx + 200));
+                            break;
+                        }
                     }
                     if (allText.length > 2000) {
                         parts.push(allText.substring(allText.length - 2000));
@@ -424,7 +432,7 @@ class SiteScraper:
                             await prod_page.wait_for_timeout(1500)
                             prod_text = await prod_page.inner_text("body")
                             if prod_text.strip():
-                                has_price = bool(price_re.search(prod_text)) or '\u20aa' in prod_text
+                                has_price = _has_price(prod_text)
                                 if has_price or not found_product_page:
                                     if found_product_page:
                                         # Replace previous no-price product page
@@ -467,7 +475,7 @@ class SiteScraper:
                                 await page.evaluate(f"document.querySelector('a[href*=\"#next\"]')?.click()")
                                 await page.wait_for_timeout(4000)
                                 new_text = await page.inner_text("body")
-                                if '\u20aa' in new_text and '\u20aa' not in text:
+                                if _has_price(new_text) and not _has_price(text):
                                     text += "\n[AFTER_ANCHOR]\n" + new_text[:4000]
                                     logger.info(f"  Found price after anchor click")
                                     break
@@ -475,6 +483,85 @@ class SiteScraper:
                                 pass
                 except Exception:
                     pass
+
+            # Store/catalog fallback: find store links in nav, hamburger menu, footer
+            if not found_product_page or not price_re.search(text):
+                try:
+                    # First try expanding hamburger menus
+                    await screenshot_page.evaluate("""() => {
+                        var btns = document.querySelectorAll(
+                            '[class*="hamburger"], [class*="menu-toggle"], [class*="mobile-menu"],'
+                            + ' [aria-label*="menu"], [aria-label*="Menu"], button.navbar-toggler,'
+                            + ' [class*="nav-toggle"], [class*="MenuToggle"]'
+                        );
+                        for (var b of btns) { try { b.click(); } catch(e) {} }
+                    }""")
+                    await screenshot_page.wait_for_timeout(1500)
+
+                    store_links = await screenshot_page.evaluate("""() => {
+                        var links = Array.from(document.querySelectorAll('a[href], nav a[href], footer a[href]'));
+                        var storeRe = /\\/collections|products?\\/|\\/shop|\\/store|\\/catalog|\\/מוצרים|חנות|מוצרים|shop|products|store|catalog|all.products|our.products/i;
+                        var badRe = /\\/(cart|policy|terms|privacy|contact|about|faq|return|shipping|account|login)\\/?$/i;
+                        var curHost = location.hostname.replace('www.', '');
+                        var seen = new Set();
+                        var results = [];
+                        for (var a of links) {
+                            var href = a.href || '';
+                            var txt = (a.innerText || '').trim().toLowerCase();
+                            if (!href || href.indexOf('javascript:') === 0) continue;
+                            try {
+                                var u = new URL(href);
+                                if (!u.hostname.replace('www.', '').includes(curHost)) continue;
+                                if (badRe.test(u.pathname)) continue;
+                                if (seen.has(u.pathname)) continue;
+                                if (storeRe.test(u.pathname) || storeRe.test(txt)) {
+                                    seen.add(u.pathname);
+                                    results.push(href);
+                                }
+                            } catch(e) {}
+                        }
+                        return results.slice(0, 3);
+                    }""")
+
+                    if store_links:
+                        for sl in store_links:
+                            logger.info(f"  Following store link: {sl[:80]}")
+                            store_page = await context.new_page()
+                            try:
+                                await store_page.goto(sl, wait_until="domcontentloaded", timeout=15000)
+                                await store_page.wait_for_timeout(2000)
+                                store_text = await store_page.inner_text("body")
+                                has_price = _has_price(store_text)
+                                if has_price and len(store_text.strip()) > 200:
+                                    logger.info(f"  Found price via store page")
+                                    idx = text.find("\n[PRODUCT PAGE]\n")
+                                    if idx > -1:
+                                        text = text[:idx]
+                                    text += "\n[PRODUCT PAGE]\n" + store_text[:6000]
+                                    sp_css = await _extract_css_price(store_page)
+                                    if sp_css:
+                                        text += f"\n[PRICE_ELEMENT]: {sp_css}"
+                                    sp_pr = await _extract_price_region(store_page)
+                                    if sp_pr:
+                                        text += f"\n[PRICE_REGION]\n{sp_pr}"
+                                    if prod_page_ref and prod_page_ref != page:
+                                        try:
+                                            await prod_page_ref.close()
+                                        except Exception:
+                                            pass
+                                    screenshot_page = store_page
+                                    prod_page_ref = store_page
+                                    found_product_page = True
+                                    break
+                                else:
+                                    await store_page.close()
+                            except Exception:
+                                try:
+                                    await store_page.close()
+                                except Exception:
+                                    pass
+                except Exception as e:
+                    logger.warning(f"  Store link fallback failed: {e}")
 
             # Fallback: if page was 404/empty and no product page found, try homepage
             if not found_product_page and len(text.strip()) < 200:
@@ -518,7 +605,7 @@ class SiteScraper:
                             await btn.click()
                             await target.wait_for_timeout(3000)
                             new_text = await target.inner_text("body")
-                            if '\u20aa' in new_text:
+                            if _has_price(new_text):
                                 text += "\n[AFTER_CLICK]\n" + new_text[:4000]
                                 logger.info(f"  Found price after button click")
                             break
