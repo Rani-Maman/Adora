@@ -89,6 +89,9 @@ SKIP_URL_PATTERNS = [
     r'^https?://[^/]*ravpage\.co\.il/',            # Landing page builder
     r'^https?://[^/]*minisite\.ms/',               # Landing page builder
     r'^https?://urlgeni\.us/',                     # URL shortener
+    r'^https?://[^/]*b144websites\.co\.il/',         # B144 Yellow Pages landing pages
+    r'^https?://(?:www\.)?b144\.co\.il/',             # B144 Yellow Pages
+    r'^https?://(?:www\.)?simplebooking\.it/',        # Hotel booking widget
 ]
 
 def should_skip_url(url: str) -> bool:
