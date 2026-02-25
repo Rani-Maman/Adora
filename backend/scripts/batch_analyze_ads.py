@@ -440,6 +440,7 @@ Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
         
         # Retry with exponential backoff for rate limits and parse errors
         for attempt in range(GEMINI_RETRY_ATTEMPTS):
+            raw_text = ""
             try:
                 grounding_config = types.GenerateContentConfig(
                     tools=[types.Tool(google_search=types.GoogleSearch())]
@@ -447,7 +448,20 @@ Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
                 resp = await self.client.aio.models.generate_content(
                     model='gemini-2.5-flash', contents=prompt, config=grounding_config
                 )
-                clean = re.sub(r'^```\w*\n?|```$', '', resp.text.strip())
+                # Extract text — resp.text can be None when grounding consumed the response
+                raw_text = resp.text or ""
+                if not raw_text:
+                    # Try extracting from candidates parts directly
+                    try:
+                        raw_text = "".join(
+                            p.text for p in resp.candidates[0].content.parts
+                            if hasattr(p, 'text') and p.text
+                        )
+                    except (IndexError, AttributeError):
+                        pass
+                if not raw_text.strip():
+                    raise ValueError(f"Empty Gemini response (finish_reason={getattr(resp.candidates[0], 'finish_reason', '?') if resp.candidates else 'no_candidates'})")
+                clean = re.sub(r'^```\w*\n?|```$', '', raw_text.strip())
                 match = re.search(r'\{[\s\S]*\}', clean)
                 if not match:
                     raise ValueError("No JSON object in response")
@@ -490,6 +504,11 @@ Category MUST be exactly one of: "dropship", "legit", "service", "uncertain"."""
                 # JSON parse failure — retry with explicit JSON instruction
                 if attempt < GEMINI_RETRY_ATTEMPTS - 1:
                     logger.warning(f"Parse error, retrying ({attempt + 1}/{GEMINI_RETRY_ATTEMPTS}): {e}")
+                    if raw_text:
+                        logger.debug(f"Raw response (first 300): {raw_text[:300]}")
+                    # Append stronger JSON nudge for retry
+                    if attempt == 0:
+                        prompt += "\n\nIMPORTANT: Return ONLY a valid JSON object, no markdown, no explanation."
                     await asyncio.sleep(GEMINI_CALL_DELAY)
                     continue
                 logger.error(f"Gemini parse error after {GEMINI_RETRY_ATTEMPTS} attempts: {e}")

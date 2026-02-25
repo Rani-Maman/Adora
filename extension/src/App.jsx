@@ -38,7 +38,11 @@ function getPriceMatches(result) {
     seen.push(norm)
     // Get cheapest match per unique source
     const bySource = {}
+    const siteIls = entry.price_ils || 0
     for (const m of entry.matches.filter(m => m.price_usd > 0)) {
+      // Skip matches more expensive than the site price
+      const matchIls = Math.round(m.price_usd * ILS_PER_USD)
+      if (siteIls > 0 && matchIls >= siteIls) continue
       const src = m.source || 'AliExpress'
       if (!bySource[src] || m.price_usd < bySource[src].price_usd) bySource[src] = m
     }
@@ -47,8 +51,8 @@ function getPriceMatches(result) {
     const name = entry.product_name_english || 'Product'
     const cheapest = sources[0][1]
     const cheapIls = Math.round(cheapest.price_usd * ILS_PER_USD)
-    const markup = entry.price_ils > 0 && cheapIls > 0
-      ? (entry.price_ils / cheapIls).toFixed(1) : null
+    const markup = siteIls > 0 && cheapIls > 0
+      ? (siteIls / cheapIls).toFixed(1) : null
     items.push({
       name,
       sitePrice: entry.price_ils,
