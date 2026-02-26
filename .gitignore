@@ -41,6 +41,9 @@ Thumbs.db
 cron.log
 logs/
 
+# Sensitive docs (contain project IDs, setup details)
+docs/user_system.md
+
 # Local folders (keep out of git)
 Old Enviroment/
 Oracle/

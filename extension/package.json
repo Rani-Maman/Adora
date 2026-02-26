@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node build-config.js && vite build && node -e \"const f='dist/index.html';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace(/ crossorigin/g,''))\"",
+    "build": "node build-config.js && node -e \"const{cpSync,rmSync}=require('fs');rmSync('dist',{recursive:true,force:true});cpSync('public','dist',{recursive:true});console.log('Copied public/ to dist/')\"",
     "build:config": "node build-config.js",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -1,5 +1,5 @@
 -- Adora DB schema (PostgreSQL 14)
--- 5 tables: scraping pipeline → analysis pipeline → extension lookup
+-- 6 tables: scraping pipeline → analysis pipeline → extension lookup + users
 
 -- ============================================================
 -- 1. meta_ads_daily — all scraped ads, deduped by unique key
@@ -94,3 +94,20 @@ CREATE TABLE IF NOT EXISTS risk_db (
 );
 
 CREATE INDEX IF NOT EXISTS idx_risk_db_base_url ON risk_db(base_url);
+
+-- ============================================================
+-- 6. users — registered extension users (Google OAuth)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    google_id TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    display_name TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

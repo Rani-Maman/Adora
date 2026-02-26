@@ -65,6 +65,7 @@ if (!env.API_BASE) {
 const API_BASE = env.API_BASE;
 const API_KEY = env.API_KEY || '';
 const RISK_THRESHOLD = env.RISK_THRESHOLD || '0.6';
+const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID || '';
 
 // Convert Set to sorted array for consistent output
 const sortedDomains = Array.from(safeDomains).sort();
@@ -77,6 +78,7 @@ const config = {
     API_BASE: '${API_BASE}',
     API_KEY: '${API_KEY}',
     RISK_THRESHOLD: ${RISK_THRESHOLD},
+    GOOGLE_CLIENT_ID: '${GOOGLE_CLIENT_ID}',
     SAFE_DOMAINS: new Set(${JSON.stringify(sortedDomains)})
 };
 

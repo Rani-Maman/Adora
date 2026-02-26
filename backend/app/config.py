@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # Extension API key (for authenticating Chrome extension requests)
     adora_api_key: str | None = None
 
+    # Auth (Google OAuth + JWT)
+    jwt_secret: str | None = None
+    jwt_expiry_hours: int = 24
+    google_client_id: str | None = None
+
     # Email (optional)
     email_sender: str | None = None
     email_password: str | None = None

@@ -12,6 +12,7 @@ const API_BASE = self.ADORA_CONFIG?.API_BASE;
 const API_KEY = self.ADORA_CONFIG?.API_KEY;
 const RISK_THRESHOLD = self.ADORA_CONFIG?.RISK_THRESHOLD || 0.6;
 const SAFE_DOMAINS = self.ADORA_CONFIG?.SAFE_DOMAINS || new Set();
+const GOOGLE_CLIENT_ID = self.ADORA_CONFIG?.GOOGLE_CLIENT_ID;
 
 // Cache settings
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (risky)
@@ -86,11 +87,99 @@ function isSafeDomain(domain) {
     return false;
 }
 
-// Listen for messages from content script
+// --- Auth helpers ---
+
+async function getStoredToken() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['adoraAccessToken'], (result) => {
+            resolve(result.adoraAccessToken || null);
+        });
+    });
+}
+
+function buildAuthHeaders(token) {
+    const headers = API_KEY ? { 'X-API-Key': API_KEY } : {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+}
+
+async function googleSignIn() {
+    if (!GOOGLE_CLIENT_ID) {
+        return { error: 'Google Client ID not configured' };
+    }
+
+    try {
+        // Build Google OAuth URL for launchWebAuthFlow
+        const redirectUri = chrome.identity.getRedirectURL();
+        const scopes = encodeURIComponent('openid email profile');
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=consent`;
+
+        const responseUrl = await chrome.identity.launchWebAuthFlow({
+            url: authUrl,
+            interactive: true,
+        });
+
+        // Extract access token from redirect URL fragment
+        const params = new URLSearchParams(new URL(responseUrl).hash.substring(1));
+        const googleToken = params.get('access_token');
+
+        if (!googleToken) {
+            return { error: 'No access token received from Google' };
+        }
+
+        // Exchange Google token for our JWT via backend
+        const resp = await fetch(`${API_BASE}/auth/google`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
+            },
+            body: JSON.stringify({ google_token: googleToken }),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            return { error: err.detail || `Auth failed (${resp.status})` };
+        }
+
+        return await resp.json();
+    } catch (err) {
+        log('ERROR', `Google sign-in failed: ${err.message}`);
+        // User closed popup or other cancellation
+        if (err.message?.includes('canceled') || err.message?.includes('closed')) {
+            return { error: 'Sign-in cancelled' };
+        }
+        return { error: err.message };
+    }
+}
+
+async function authLogout() {
+    const token = await getStoredToken();
+    if (token && API_BASE) {
+        try {
+            await fetch(`${API_BASE}/auth/logout`, {
+                method: 'POST',
+                headers: buildAuthHeaders(token),
+            });
+        } catch {
+            // Best-effort — client cleanup is what matters
+        }
+    }
+}
+
+// Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CHECK_URL') {
         checkUrl(message.url, sender.tab?.id).then(sendResponse);
         return true; // Keep channel open for async response
+    }
+    if (message.type === 'AUTH_GOOGLE_SIGN_IN') {
+        googleSignIn().then(sendResponse);
+        return true;
+    }
+    if (message.type === 'AUTH_LOGOUT') {
+        authLogout().then(() => sendResponse({ ok: true }));
+        return true;
     }
     if (message.type === 'GET_STATS') {
         // Calculate metrics
@@ -155,8 +244,9 @@ async function checkUrl(url, tabId) {
         const startTime = performance.now();
         
         log('INFO', `API call: ${domain}`, { source: 'api' });
+        const userToken = await getStoredToken();
         const response = await fetch(`${API_BASE}/check/?url=${encodeURIComponent(url)}`, {
-            headers: API_KEY ? { 'X-API-Key': API_KEY } : {}
+            headers: buildAuthHeaders(userToken),
         });
 
         if (!response.ok) {
@@ -203,7 +293,7 @@ async function checkUrl(url, tabId) {
 
 // Update extension badge based on risk
 function updateBadge(tabId, result) {
-    if (!result) return;
+    if (!result || !tabId) return;
 
     // Only show badge for risky sites
     if (result.risky && result.score >= RISK_THRESHOLD) {
@@ -218,6 +308,14 @@ function updateBadge(tabId, result) {
 // Clear badge when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
     chrome.action.setBadgeText({ tabId, text: '' });
+});
+
+// Extension icon click → toggle widget in active tab
+chrome.action.onClicked.addListener((tab) => {
+    if (!tab?.id || !tab.url?.startsWith('http')) return;
+    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_WIDGET' }).catch(() => {
+        // Content script not ready yet — ignore
+    });
 });
 
 // Global function to print stats (can be called from console)
