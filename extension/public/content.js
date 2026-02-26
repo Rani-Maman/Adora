@@ -41,16 +41,18 @@
       thisSite: 'This site', markup: 'more expensive', view: 'View',
       viewArrow: '\u2192',
       disclaimer: 'The extension provides information only and does not constitute a final assessment.<br>Adora does not guarantee the accuracy or completeness of the information and is not responsible for purchasing decisions. It is recommended to independently verify the seller and the transaction details before any purchase.',
+      dropshipInfo: 'Dropshipping is a selling model where the seller doesn\'t keep stock: they list a product, and after you buy, a third-party supplier ships it. The same item is often sold at a much higher price than the original source price (e.g., on AliExpress/Temu), so it\'s smart to compare prices and check reviews and delivery times.',
     },
     he: {
       signIn: '\u05D4\u05EA\u05D7\u05D1\u05E8\u05D5\u05EA \u05E2\u05DD Google', signOut: '\u05D4\u05EA\u05E0\u05EA\u05E7',
       analyzing: '\u05DE\u05E0\u05EA\u05D7 \u05D0\u05EA\u05E8...', noConcerns: '\u05D4\u05D0\u05EA\u05E8 \u05E0\u05E8\u05D0\u05D4 \u05D1\u05D8\u05D5\u05D7 \u05E2\u05D1\u05D5\u05E8\u05DA',
       potentialDropship: '\u05E9\u05D9\u05DD \u05DC\u05D1 - \u05D9\u05D9\u05EA\u05DB\u05DF \u05E9\u05D6\u05D4\u05D5 \u05D0\u05EA\u05E8 \u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2',
       noMatches: '\u05D0\u05E0\u05D7\u05E0\u05D5 \u05DE\u05D7\u05E4\u05E9\u05D9\u05DD \u05E2\u05D1\u05D5\u05E8\u05DA \u05D0\u05E4\u05E9\u05E8\u05D5\u05D9\u05D5\u05EA \u05D6\u05D5\u05DC\u05D5\u05EA \u05D9\u05D5\u05EA\u05E8 - \u05D1\u05D3\u05E7\u05D5 \u05E9\u05D5\u05D1 \u05D1\u05E7\u05E8\u05D5\u05D1.',
-      cheaperElsewhere: '\u05DE\u05E6\u05D0\u05E0\u05D5 \u05D0\u05E4\u05E9\u05E8\u05D5\u05EA \u05D6\u05D5\u05DC\u05D4 \u05D9\u05D5\u05EA\u05E8 \u05D1\u05E9\u05D1\u05D9\u05DC\u05DA',
+      cheaperElsewhere: '\u05DE\u05E6\u05D0\u05E0\u05D5 \u05D0\u05E4\u05E9\u05E8\u05D5\u05D9\u05D5\u05EA \u05D6\u05D5\u05DC\u05D5\u05EA \u05D9\u05D5\u05EA\u05E8 \u05D1\u05E9\u05D1\u05D9\u05DC\u05DA',
       thisSite: '\u05D0\u05EA\u05E8 \u05D6\u05D4', markup: '\u05D9\u05E7\u05E8 \u05D9\u05D5\u05EA\u05E8', view: '\u05E6\u05E4\u05D4',
       viewArrow: '\u2190',
       disclaimer: '\u05D4\u05EA\u05D5\u05E1\u05E3 \u05DE\u05E1\u05E4\u05E7 \u05DE\u05D9\u05D3\u05E2 \u05D1\u05DC\u05D1\u05D3 \u05D5\u05D0\u05D9\u05E0\u05D5 \u05DE\u05D4\u05D5\u05D5\u05D4 \u05D4\u05E2\u05E8\u05DB\u05D4 \u05E1\u05D5\u05E4\u05D9\u05EA.<br>Adora \u05D0\u05D9\u05E0\u05D4 \u05DE\u05EA\u05D7\u05D9\u05D9\u05D1\u05EA \u05DC\u05D3\u05D9\u05D5\u05E7 \u05D0\u05D5 \u05DC\u05E9\u05DC\u05DE\u05D5\u05EA \u05D4\u05DE\u05D9\u05D3\u05E2 \u05D5\u05D0\u05D9\u05E0\u05D4 \u05D0\u05D7\u05E8\u05D0\u05D9\u05EA \u05DC\u05D4\u05D7\u05DC\u05D8\u05D5\u05EA \u05E8\u05DB\u05D9\u05E9\u05D4. \u05DE\u05D5\u05DE\u05DC\u05E5 \u05DC\u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D4\u05DE\u05D5\u05DB\u05E8 \u05D5\u05D0\u05EA \u05E4\u05E8\u05D8\u05D9 \u05D4\u05E2\u05E1\u05E7\u05D4 \u05D1\u05D0\u05D5\u05E4\u05DF \u05E2\u05E6\u05DE\u05D0\u05D9 \u05DC\u05E4\u05E0\u05D9 \u05DB\u05DC \u05E8\u05DB\u05D9\u05E9\u05D4.',
+      dropshipInfo: '\u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2 (Dropshipping) \u05D4\u05D5\u05D0 \u05DE\u05D5\u05D3\u05DC \u05DE\u05DB\u05D9\u05E8\u05D4 \u05E9\u05D1\u05D5 \u05D4\u05DE\u05D5\u05DB\u05E8 \u05DC\u05D0 \u05DE\u05D7\u05D6\u05D9\u05E7 \u05DE\u05DC\u05D0\u05D9: \u05D4\u05D5\u05D0 \u05DE\u05E4\u05E8\u05E1\u05DD \u05DE\u05D5\u05E6\u05E8, \u05D5\u05DB\u05E9\u05D0\u05EA\u05DD \u05E7\u05D5\u05E0\u05D9\u05DD - \u05E1\u05E4\u05E7 \u05E6\u05D3-\u05E9\u05DC\u05D9\u05E9\u05D9 \u05E9\u05D5\u05DC\u05D7 \u05D0\u05D5\u05EA\u05D5 \u05D9\u05E9\u05D9\u05E8\u05D5\u05EA. \u05DC\u05E2\u05D9\u05EA\u05D9\u05DD \u05D0\u05D5\u05EA\u05D5 \u05DE\u05D5\u05E6\u05E8 \u05E0\u05DE\u05DB\u05E8 \u05DB\u05D0\u05DF \u05D1\u05DE\u05D7\u05D9\u05E8 \u05D2\u05D1\u05D5\u05D4 \u05DE\u05E9\u05DE\u05E2\u05D5\u05EA\u05D9\u05EA \u05DE\u05D4\u05DE\u05D7\u05D9\u05E8 \u05D4\u05DE\u05E7\u05D5\u05E8\u05D9 (\u05DC\u05DE\u05E9\u05DC \u05D1\u05D0\u05EA\u05E8\u05D9\u05DD \u05DB\u05DE\u05D5 AliExpress/Temu), \u05D5\u05DC\u05DB\u05DF \u05DE\u05D5\u05DE\u05DC\u05E5 \u05DC\u05D4\u05E9\u05D5\u05D5\u05EA \u05DE\u05D7\u05D9\u05E8\u05D9\u05DD \u05D5\u05DC\u05D1\u05D3\u05D5\u05E7 \u05D1\u05D9\u05E7\u05D5\u05E8\u05D5\u05EA \u05D5\u05D6\u05DE\u05E0\u05D9 \u05DE\u05E9\u05DC\u05D5\u05D7.',
     }
   };
 
@@ -141,6 +143,7 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
       .adora-widget {
+        position: relative;
         width: 100%; max-height: 80vh;
         border-radius: 14px;
         background: ${t.bg};
@@ -233,6 +236,31 @@
       }
       .alert-icon { font-size: 20px; }
       .alert-title { font-size: 14px; font-weight: 600; color: ${t.danger}; }
+      .info-icon {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 15px; height: 15px; border-radius: 50%; font-size: 10px; font-weight: 700;
+        background: ${t.dangerBg}; color: ${t.danger}; border: 1px solid ${t.danger};
+        cursor: pointer; margin-inline-start: 4px; flex-shrink: 0;
+        font-style: normal;
+      }
+      .info-overlay {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center;
+        z-index: 9999; border-radius: 12px;
+      }
+      .info-modal {
+        background: ${t.bg}; color: ${t.text}; border: 1px solid ${t.border};
+        border-radius: 10px; padding: 16px 18px; margin: 12px;
+        font-size: 12px; line-height: 1.6;
+        text-align: ${isRtl ? 'right' : 'left'}; direction: ${isRtl ? 'rtl' : 'ltr'};
+      }
+      .info-modal-close {
+        display: block; margin-top: 12px;
+        margin-inline-start: auto; margin-inline-end: 0;
+        padding: 5px 16px; border-radius: 6px; border: none; cursor: pointer;
+        background: ${t.accent}; color: ${t.accentText}; font-size: 11px; font-weight: 600;
+      }
+      .info-modal-close:hover { opacity: 0.85; }
       .no-matches {
         font-size: 11px; color: ${t.textSec}; background: ${t.dangerBg};
         padding: 8px 10px; border-radius: 6px; margin-bottom: 12px; line-height: 1.5;
@@ -338,7 +366,7 @@
       html += `<div class="alert">
         <div class="alert-header">
           <span class="alert-icon">\u26A0\uFE0F</span>
-          <span class="alert-title">${l.potentialDropship}</span>
+          <span class="alert-title">${l.potentialDropship} <i class="info-icon" id="dropship-info-btn">i</i></span>
         </div>`;
 
       const matches = getPriceMatches(siteResult);
@@ -423,6 +451,17 @@
     if (closeBtn) closeBtn.onclick = hideWidget;
     if (signinBtn) signinBtn.onclick = handleSignIn;
     if (signoutBtn) signoutBtn.onclick = handleSignOut;
+
+    const infoBtn = shadow.getElementById('dropship-info-btn');
+    if (infoBtn) infoBtn.onclick = () => {
+      const l = i18n[curLang];
+      const overlay = document.createElement('div');
+      overlay.className = 'info-overlay';
+      overlay.innerHTML = `<div class="info-modal">${l.dropshipInfo}<button class="info-modal-close">\u2715</button></div>`;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      overlay.querySelector('.info-modal-close').onclick = () => overlay.remove();
+      widgetContainer.appendChild(overlay);
+    };
   }
 
   function bindMinimizedEvents() {
