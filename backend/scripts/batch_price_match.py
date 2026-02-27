@@ -53,6 +53,33 @@ GEMINI_CALL_DELAY = 2  # seconds between API calls
 MAX_RUNTIME = _args.max_runtime
 RETRY_MODE = _args.retry_failures
 
+def normalize_source(source: str, url: str = "") -> str:
+    """Extract actual site name from vague Gemini labels."""
+    combined = f"{source} {url}".lower()
+    if "aliexpress" in combined:
+        return "AliExpress"
+    if "temu" in combined:
+        return "Temu"
+    if "alibaba" in combined:
+        return "Alibaba"
+    if "amazon" in combined:
+        return "Amazon"
+    if "walmart" in combined:
+        return "Walmart"
+    if "ebay" in combined:
+        return "eBay"
+    if url:
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(url).hostname or ""
+            domain = domain.replace("www.", "").split(".")[0].capitalize()
+            if domain:
+                return domain
+        except Exception:
+            pass
+    return source
+
+
 # URL patterns that are never real product pages
 BAD_URL_PATTERNS = [
     r"^https?://(www\.)?t\.me/",
@@ -753,6 +780,8 @@ async def search_cheaper(client, product_info: dict) -> dict:
         await asyncio.sleep(GEMINI_CALL_DELAY)
         result = parse_json(resp.text)
         if result:
+            for m in result.get("matches", []):
+                m["source"] = normalize_source(m.get("source", ""), m.get("url", ""))
             return result
 
         # Retry with stricter prompt on parse failure
@@ -770,6 +799,8 @@ async def search_cheaper(client, product_info: dict) -> dict:
         await asyncio.sleep(GEMINI_CALL_DELAY)
         result2 = parse_json(resp2.text)
         if result2:
+            for m in result2.get("matches", []):
+                m["source"] = normalize_source(m.get("source", ""), m.get("url", ""))
             return result2
 
         # Last resort: extract price/URL from raw text via regex
@@ -781,7 +812,7 @@ async def search_cheaper(client, product_info: dict) -> dict:
             for i, u in enumerate(urls[:3]):
                 p = float(prices[i]) if i < len(prices) else 0
                 fallback_matches.append({
-                    "source": "aliexpress" if "aliexpress" in u else "temu" if "temu" in u else "alibaba",
+                    "source": normalize_source("", u),
                     "product_name": name[:60],
                     "price_usd": p,
                     "url": u.rstrip(".,)\"'"),
