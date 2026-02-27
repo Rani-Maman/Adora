@@ -71,21 +71,29 @@ Each keyword runs as an independent cron job, staggered 1 hour apart to avoid ra
 ```
 run_meta_keyword_job.sh
   ├── flock (prevent concurrent runs)
+  ├── cleanup Playwright orphans
   ├── timeout --signal=TERM $HARD_TIMEOUT
   └── python3 daily_meta_scrape.py --config $CONFIG
-        ├── Load keyword config JSON
-        ├── For each ad library search link:
-        │     ├── meta_ads_http_scraper.scrape_meta_ads_http()
-        │     │     ├── POST to Meta GraphQL endpoint
-        │     │     ├── Paginate via forward_cursor (max 250 pages)
-        │     │     ├── Extract: advertiser_name, page_url, ad_body, external_links
-        │     │     └── Stop when: no more results, target_ads reached, or runtime exceeded
-        │     └── Filter: remove social URLs (fb, ig, wa, messenger)
-        ├── select_rows_for_keyword() — dedup + select unique advertisers
-        ├── Dedup by SHA1(date + keyword + normalized_name)
-        ├── Insert into meta_ads_daily + meta_ads_daily_with_urls
-        ├── Insert into advertisers + ads_with_urls (legacy tables)
-        └── Save JSON output + log files
+  │     ├── Load keyword config JSON
+  │     ├── For each ad library search link:
+  │     │     ├── meta_ads_http_scraper.scrape_meta_ads_http()
+  │     │     │     ├── POST to Meta GraphQL endpoint
+  │     │     │     ├── Paginate via forward_cursor (max 250 pages)
+  │     │     │     ├── Extract: advertiser_name, page_url, ad_body, external_links
+  │     │     │     └── Stop when: no more results, target_ads reached, or runtime exceeded
+  │     │     └── Filter: remove social URLs (fb, ig, wa, messenger)
+  │     ├── select_rows_for_keyword() — dedup + select unique advertisers
+  │     ├── Dedup by SHA1(date + keyword + normalized_name)
+  │     ├── Insert into meta_ads_daily + meta_ads_daily_with_urls
+  │     ├── Insert into advertisers + ads_with_urls (legacy tables)
+  │     └── Save JSON output + log files
+  │
+  └── Rate-limit retry (post-run)
+        ├── If exit=0 AND runtime <5 min AND ads_captured <1000:
+        │     ├── Log "Rate-limited" with ad count + elapsed time
+        │     ├── Sleep 25 min (Meta cooldown ~20-30 min)
+        │     └── Re-run same scraper command once
+        └── Stays within 1h slot (25 min wait + ~15 min retry = ~40 min max)
 ```
 
 ### Scraper Settings (run_meta_keyword_job.sh defaults)
@@ -99,6 +107,9 @@ run_meta_keyword_job.sh
 | `max_pages` | `250` | Max GraphQL pagination pages (in scraper code) |
 | `per-link-timeout-sec` | `1850` | Hard timeout per link including overhead |
 | `max-total-minutes` | `35` | Total job timeout |
+| Rate-limit retry: min runtime | `300s` | Jobs finishing faster than this are considered rate-limited |
+| Rate-limit retry: min ads | `1000` | Jobs below this ad count trigger retry |
+| Rate-limit retry: delay | `1500s` | 25 min wait before retry (Meta cooldown) |
 
 ### Deduplication
 
@@ -388,7 +399,7 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
 
 ## 5. Database Schema
 
-5 tables total. Schema defined in `backend/scripts/create_tables.sql`.
+7 tables total. Schema defined in `backend/scripts/create_tables.sql`.
 
 ```
 ┌──────────────────┐    ┌────────────────────────┐
@@ -439,6 +450,8 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
 | `advertisers` | Unique advertisers by name | `daily_meta_scrape.py` |
 | `ads_with_urls` | Unique ads by destination URL, scored by analysis | `daily_meta_scrape.py` + `batch_analyze_ads.py` |
 | `risk_db` | Risky domains (score >= 0.6) + price_matches JSONB + advertiser_name, queried by extension | `batch_analyze_ads.py` + `batch_price_match.py` |
+| `users` | Google OAuth users (google_id, email, display_name, avatar_url) | `POST /auth/google` |
+| `community_reports` | User-submitted dropship site reports (reported_url, cheaper_url, status) | `POST /report` |
 
 ---
 
@@ -446,7 +459,7 @@ Failed URLs are excluded from normal runs. `--retry-failures` re-processes them 
 
 ### Architecture
 
-Manifest V3 Chrome extension with a 3-tier checking system:
+Manifest V3 Chrome extension with Google OAuth login, floating widget UI, and 3-tier risk checking:
 
 ```
 User navigates to URL
@@ -457,40 +470,68 @@ User navigates to URL
               └── Returns {risky, score, evidence} or {risky: false}
 ```
 
-### Badge Behavior
-- **No badge**: Site not in risk_db or whitelisted
-- **Red "!"**: Risk score >= 0.6 — banner + popup show warning with price comparisons
+### Authentication
 
-### UI Components
+Google OAuth via `chrome.identity.launchWebAuthFlow()`. Mandatory — all widget content blocked until sign-in.
 
-**Page Banner** (`content.js`): Auto-injected at top of risky sites. Shows:
-- "Potential Dropship Site Detected" warning
-- Price comparison cards with cheaper alternatives (up to 3 products, 3 sources each)
-- Markup badges (e.g. "14.1x markup"), ILS prices, View links to source platforms
-- "No cheaper alternatives found yet" message when price data pending
-- Dismiss button
+```
+Login flow:
+  1. User clicks "Sign in with Google"
+  2. chrome.identity.launchWebAuthFlow() → Google OAuth dialog
+  3. Extract access_token from redirect URL
+  4. POST /auth/google (exchange Google token → JWT)
+  5. Store JWT + user profile in chrome.storage.local
+  6. Widget re-renders with authenticated content
+```
 
-**Popup** (`App.jsx`): Click extension icon. Shows:
-- Adora logo + "Dropship Detector" header
-- For risky sites: warning + price comparison cards (same data as banner)
-- For safe sites: "No concerns detected"
-- Hover disclaimer (ⓘ icon)
+- **Token storage**: `chrome.storage.local` (persists across browser restarts)
+- **Token expiry**: JWT valid 30 days (`JWT_EXPIRY_HOURS=720` on VM)
+- **401 handling**: background.js clears stored auth on expired token → widget shows login screen
+- **Logout**: clears `adoraAccessToken` + `adoraUser` from storage → login screen
+
+### Widget UI (`content.js`)
+
+Floating draggable widget injected via Shadow DOM (`attachShadow({mode: 'closed'})`).
+
+**States:**
+1. **Login screen** (not signed in): Sign In button, "What is Adora?" (info modal), "Contact Us" (mailto). All other content blocked.
+2. **Risky site** (signed in, score >= 0.6): Warning alert, price comparison cards, dropship info "i" button, disclaimer
+3. **Safe site** (signed in, not risky): Education card (Adora intro + collapsible "What is dropshipping?"), community report CTA
+4. **Loading**: Spinner while CHECK_URL response pending
+5. **Minimized**: Small pill with icon, click to expand
+
+**Header** (all states): Logo, title, lang toggle (EN/עב), theme toggle (light/dark), minimize, close
+
+### Community Reports
+
+Signed-in users can report dropshipping sites from the safe-site view.
+
+```
+Report flow:
+  1. CTA card shown on safe sites: "Want to report a site?"
+  2. Click → modal overlay with form (site URL, cheaper product link)
+  3. POST /report → JWT auth, 3/day rate limit (DB-enforced)
+  4. GET /report/remaining → shows X/3 reports left today
+```
+
+- **Rate limit**: 3 reports per user per 24h (enforced in DB via COUNT with interval)
+- **CTA disabled**: when 0 reports remaining (dimmed + "Daily limit reached" text)
+- **Validation**: both URLs required, must start with `https?://`, max 2000 chars
 
 ### Price Display Logic
 - USD→ILS conversion: `price_usd / 0.27`
 - Deduplication: similar product names collapsed (substring match after normalization)
 - Per product: cheapest match from each unique source (up to 3 sources)
 - Expired Google redirect URLs replaced with platform search links (AliExpress, Temu, Alibaba)
+- Source names normalized: Gemini output mapped to canonical names (AliExpress, Temu, Alibaba, Amazon, etc.)
 
 ### Key Files
 
 | File | Role |
 |------|------|
-| `extension/public/background.js` | Service worker — API calls, caching, badge updates |
-| `extension/public/content.js` | Content script — page banner injection with price cards |
+| `extension/public/background.js` | Service worker — API calls, caching, badge updates, auth |
+| `extension/public/content.js` | Content script — floating widget with Shadow DOM |
 | `extension/public/config.js` | Auto-generated config (API base, whitelist, thresholds) |
-| `extension/src/App.jsx` | React popup UI with price comparisons |
-| `extension/src/App.css` | Popup styles |
 | `extension/build-config.js` | Build script — generates config.js from .env + whitelists |
 | `extension/public/manifest.json` | Chrome Manifest V3 |
 
@@ -500,17 +541,27 @@ User navigates to URL
 
 ### Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/` | Health check |
-| `GET` | `/health` | Detailed health info |
-| `GET` | `/check/?url=X` | Risk lookup + price_matches from risk_db (extension uses this) |
-| `POST` | `/analyze/` | On-demand deep analysis (Playwright + Gemini) |
-| `GET` | `/whitelist/domains` | Full whitelist |
-| `GET` | `/whitelist/check/{domain}` | Single domain whitelist check |
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/` | — | Health check |
+| `GET` | `/health` | — | Detailed health info |
+| `GET` | `/check/?url=X` | API key | Risk lookup + price_matches from risk_db |
+| `POST` | `/analyze/` | API key | On-demand deep analysis (Playwright + Gemini) |
+| `GET` | `/whitelist/domains` | API key | Full whitelist |
+| `GET` | `/whitelist/check/{domain}` | API key | Single domain whitelist check |
+| `POST` | `/auth/google` | API key | Exchange Google token → JWT + upsert user |
+| `POST` | `/report` | JWT + API key | Submit community report (3/day limit) |
+| `GET` | `/report/remaining` | JWT + API key | Get remaining daily report count |
+
+### Auth
+- **API key**: `X-API-Key` header required on all protected paths
+- **JWT**: `Authorization: Bearer <token>` for user-specific endpoints (`/report`)
+- JWT created via `auth_utils.create_access_token()`, validated via `require_user()` dependency
+- JWT payload: `{sub, email, iss, aud, iat, exp}`, signed HS256
 
 ### Middleware
 - CORS (all origins — configured for extension access)
+- API key validation middleware (checks `X-API-Key` header on protected paths)
 - Request logging with timing, client IP, user agent
 
 ---

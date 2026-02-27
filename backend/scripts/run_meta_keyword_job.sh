@@ -160,6 +160,8 @@ if [[ "${META_DAILY_USE_XVFB:-0}" == "1" ]]; then
   fi
 fi
 
+START_TS=$(date +%s)
+
 set +e
 timeout --signal=TERM "${HARD_TIMEOUT_SEC}" "${RUNNER[@]}" 2>&1 | tee -a "${LOG_FILE}"
 status=${PIPESTATUS[0]}
@@ -169,6 +171,31 @@ fi
 set -e
 
 cleanup_playwright_orphans
+
+# --- Rate-limit retry: if finished fast with few ads, wait 25 min and retry once ---
+ELAPSED=$(( $(date +%s) - START_TS ))
+MIN_RUNTIME=300
+MIN_ADS=1000
+RETRY_DELAY=1500
+
+ADS_CAPTURED=$(grep -o '"ads_captured": [0-9]*' "${LOG_FILE}" | tail -1 | grep -o '[0-9]*' || echo "0")
+ADS_CAPTURED=${ADS_CAPTURED:-0}
+
+if [[ ${status} -eq 0 ]] && [[ ${ELAPSED} -lt ${MIN_RUNTIME} ]] && [[ ${ADS_CAPTURED} -lt ${MIN_ADS} ]]; then
+  echo "[$(date -Is)] Rate-limited: ${ADS_CAPTURED} ads in ${ELAPSED}s. Retrying in $(( RETRY_DELAY / 60 )) min..." | tee -a "${LOG_FILE}"
+  sleep ${RETRY_DELAY}
+  echo "[$(date -Is)] Retry starting for ${JOB_NAME}..." | tee -a "${LOG_FILE}"
+
+  set +e
+  timeout --signal=TERM "${HARD_TIMEOUT_SEC}" "${RUNNER[@]}" 2>&1 | tee -a "${LOG_FILE}"
+  status=${PIPESTATUS[0]}
+  set -e
+
+  cleanup_playwright_orphans
+
+  RETRY_ADS=$(grep -o '"ads_captured": [0-9]*' "${LOG_FILE}" | tail -1 | grep -o '[0-9]*' || echo "0")
+  echo "[$(date -Is)] Retry finished: ${RETRY_ADS:-0} ads, exit=${status}" | tee -a "${LOG_FILE}"
+fi
 
 echo "[$(date -Is)] Finished ${JOB_NAME} with exit=${status}"
 exit "${status}"

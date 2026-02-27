@@ -103,6 +103,11 @@ function buildAuthHeaders(token) {
     return headers;
 }
 
+function handleExpiredToken() {
+    chrome.storage.local.remove(['adoraAccessToken', 'adoraUser']);
+    return { error: 'session_expired' };
+}
+
 async function googleSignIn() {
     if (!GOOGLE_CLIENT_ID) {
         return { error: 'Google Client ID not configured' };
@@ -192,6 +197,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     body: JSON.stringify(message.data),
                 });
                 const data = await resp.json();
+                if (resp.status === 401) return sendResponse(handleExpiredToken());
                 if (!resp.ok) return sendResponse({ error: data.detail || `Error ${resp.status}` });
                 sendResponse(data);
             } catch (err) {
@@ -208,6 +214,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const resp = await fetch(`${API_BASE}/report/remaining`, {
                     headers: buildAuthHeaders(token),
                 });
+                if (resp.status === 401) return sendResponse(handleExpiredToken());
                 const data = await resp.json();
                 if (!resp.ok) return sendResponse({ remaining: 0, limit: 3 });
                 sendResponse(data);

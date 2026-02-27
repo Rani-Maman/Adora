@@ -54,7 +54,9 @@
       reportSignInRequired: 'Sign in to report sites',
       reportRemaining: 'reports left today',
       dropshipInfoTitle: 'What is dropshipping?',
-      eduIntro: 'Adora automatically checks shopping sites you visit and alerts you if they appear to be dropshipping - selling products at inflated prices from suppliers like AliExpress or Temu.',
+      eduIntro: 'Adora automatically checks shopping sites you visit and alerts you if they appear to be dropshipping - selling products at inflated prices from suppliers like AliExpress or Temu.<br>When a site is flagged, we automatically search for the same product at a lower price so you always get the best deal.',
+      whatIsAdora: 'What is Adora?',
+      contactUs: 'Contact Us',
     },
     he: {
       signIn: '\u05D4\u05EA\u05D7\u05D1\u05E8\u05D5\u05EA \u05E2\u05DD Google', signOut: '\u05D4\u05EA\u05E0\u05EA\u05E7',
@@ -78,7 +80,9 @@
       reportSignInRequired: '\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DB\u05D3\u05D9 \u05DC\u05D3\u05D5\u05D5\u05D7 \u05E2\u05DC \u05D0\u05EA\u05E8\u05D9\u05DD',
       reportRemaining: '\u05D3\u05D9\u05D5\u05D5\u05D7\u05D9\u05DD \u05E0\u05D5\u05EA\u05E8\u05D5 \u05D4\u05D9\u05D5\u05DD',
       dropshipInfoTitle: '\u05DE\u05D4 \u05D6\u05D4 \u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2?',
-      eduIntro: 'Adora \u05D1\u05D5\u05D3\u05E7\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D0\u05EA\u05E8\u05D9 \u05E7\u05E0\u05D9\u05D5\u05EA \u05E9\u05D0\u05EA\u05DD \u05DE\u05D1\u05E7\u05E8\u05D9\u05DD \u05D1\u05D4\u05DD \u05D5\u05DE\u05EA\u05E8\u05D9\u05E2\u05D4 \u05D0\u05DD \u05D4\u05DD \u05E0\u05E8\u05D0\u05D9\u05DD \u05DB\u05D0\u05EA\u05E8\u05D9 \u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2 - \u05E9\u05DE\u05D5\u05DB\u05E8\u05D9\u05DD \u05DE\u05D5\u05E6\u05E8\u05D9\u05DD \u05D1\u05DE\u05D7\u05D9\u05E8\u05D9\u05DD \u05DE\u05E0\u05D5\u05E4\u05D7\u05D9\u05DD \u05DE\u05E1\u05E4\u05E7\u05D9\u05DD \u05DB\u05DE\u05D5 AliExpress \u05D0\u05D5 Temu.',
+      eduIntro: 'Adora \u05D1\u05D5\u05D3\u05E7\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D0\u05EA\u05E8\u05D9 \u05E7\u05E0\u05D9\u05D5\u05EA \u05E9\u05D0\u05EA\u05DD \u05DE\u05D1\u05E7\u05E8\u05D9\u05DD \u05D1\u05D4\u05DD \u05D5\u05DE\u05EA\u05E8\u05D9\u05E2\u05D4 \u05D0\u05DD \u05D4\u05DD \u05E0\u05E8\u05D0\u05D9\u05DD \u05DB\u05D0\u05EA\u05E8\u05D9 \u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2 - \u05E9\u05DE\u05D5\u05DB\u05E8\u05D9\u05DD \u05DE\u05D5\u05E6\u05E8\u05D9\u05DD \u05D1\u05DE\u05D7\u05D9\u05E8\u05D9\u05DD \u05DE\u05E0\u05D5\u05E4\u05D7\u05D9\u05DD \u05DE\u05E1\u05E4\u05E7\u05D9\u05DD \u05DB\u05DE\u05D5 AliExpress \u05D0\u05D5 Temu.<br>\u05DB\u05E9\u05D0\u05EA\u05E8 \u05DE\u05E1\u05D5\u05DE\u05DF, \u05D0\u05E0\u05D7\u05E0\u05D5 \u05DE\u05D7\u05E4\u05E9\u05D9\u05DD \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D0\u05EA \u05D0\u05D5\u05EA\u05D5 \u05DE\u05D5\u05E6\u05E8 \u05D1\u05DE\u05D7\u05D9\u05E8 \u05D6\u05D5\u05DC \u05D9\u05D5\u05EA\u05E8 \u05DB\u05D3\u05D9 \u05E9\u05EA\u05DE\u05D9\u05D3 \u05EA\u05E7\u05D1\u05DC\u05D5 \u05D0\u05EA \u05D4\u05E2\u05E1\u05E7\u05D4 \u05D4\u05D8\u05D5\u05D1\u05D4 \u05D1\u05D9\u05D5\u05EA\u05E8.',
+      whatIsAdora: '\u05DE\u05D4 \u05D6\u05D4 Adora?',
+      contactUs: '\u05E6\u05D5\u05E8 \u05E7\u05E9\u05E8',
     }
   };
 
@@ -250,6 +254,20 @@
       }
       .auth-signin-btn:hover { background: ${t.accentHover}; }
       .auth-signin-btn:disabled { opacity: 0.5; cursor: default; }
+
+      /* Login screen */
+      .login-screen { display: flex; flex-direction: column; align-items: center; padding: 24px 16px; gap: 12px; }
+      .login-logo { width: 48px; height: 48px; border-radius: 12px; margin-bottom: 8px; }
+      .login-btn {
+        display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center;
+        font-size: 13px; font-weight: 500; padding: 10px 14px; border-radius: 10px;
+        cursor: pointer; transition: all 0.15s; border: 1px solid ${t.border};
+      }
+      .login-btn.primary { background: ${t.accent}; border-color: ${t.accent}; color: ${t.accentText}; }
+      .login-btn.primary:hover { background: ${t.accentHover}; }
+      .login-btn.primary:disabled { opacity: 0.5; cursor: default; }
+      .login-btn.secondary { background: ${t.bgCard}; color: ${t.text}; }
+      .login-btn.secondary:hover { border-color: ${t.accent}; background: ${t.accentLight}; }
 
       /* Status */
       .status {
@@ -453,21 +471,28 @@
     // Body
     html += '<div class="body">';
 
-    // Auth
-    if (authUser) {
-      html += `<div class="auth-bar">
-        <div class="auth-user">
-          ${authUser.avatar_url ? `<img src="${authUser.avatar_url}" alt="" class="auth-avatar" referrerpolicy="no-referrer">` : ''}
-          <span class="auth-name">${authUser.display_name || ''}</span>
-        </div>
-        <button class="auth-logout-btn" id="adora-signout">${l.signOut}</button>
+    // Login screen — blocks all content when not signed in
+    if (!authUser) {
+      html += `<div class="login-screen">
+        <button class="login-btn primary" id="adora-signin" ${authLoading ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          ${l.signIn}
+        </button>
+        <button class="login-btn secondary" id="adora-about">${l.whatIsAdora}</button>
+        <button class="login-btn secondary" id="adora-contact">${l.contactUs}</button>
       </div>`;
-    } else {
-      html += `<button class="auth-signin-btn" id="adora-signin" ${authLoading ? 'disabled' : ''}>
-        <svg viewBox="0 0 24 24" width="14" height="14"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        ${l.signIn}
-      </button>`;
+      html += '</div>';
+      return html;
     }
+
+    // Auth bar (signed in)
+    html += `<div class="auth-bar">
+      <div class="auth-user">
+        ${authUser.avatar_url ? `<img src="${authUser.avatar_url}" alt="" class="auth-avatar" referrerpolicy="no-referrer">` : ''}
+        <span class="auth-name">${authUser.display_name || ''}</span>
+      </div>
+      <button class="auth-logout-btn" id="adora-signout">${l.signOut}</button>
+    </div>`;
 
     // Result
     if (!siteResult) {
@@ -587,6 +612,22 @@
     if (closeBtn) closeBtn.onclick = hideWidget;
     if (signinBtn) signinBtn.onclick = handleSignIn;
     if (signoutBtn) signoutBtn.onclick = handleSignOut;
+
+    // Login screen buttons
+    const aboutBtn = shadow.getElementById('adora-about');
+    if (aboutBtn) aboutBtn.onclick = () => {
+      const l = i18n[curLang] || i18n.en;
+      const overlay = document.createElement('div');
+      overlay.className = 'info-overlay-inline';
+      overlay.innerHTML = `<div class="info-modal">${l.eduIntro}<button class="info-modal-close">\u2715</button></div>`;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      overlay.querySelector('.info-modal-close').onclick = () => overlay.remove();
+      widgetContainer.appendChild(overlay);
+    };
+    const contactBtn = shadow.getElementById('adora-contact');
+    if (contactBtn) contactBtn.onclick = () => {
+      window.open('mailto:adoraaiextension@gmail.com', '_blank');
+    };
 
     const pmToggle = shadow.getElementById('pm-toggle');
     const pmMore = shadow.getElementById('pm-more');
@@ -788,6 +829,7 @@
   // ====== Report Remaining ======
   function fetchReportRemaining(cb) {
     chrome.runtime.sendMessage({ type: 'GET_REPORT_REMAINING' }, (resp) => {
+      if (resp?.error === 'session_expired') { authUser = null; render(); return; }
       if (resp) reportRemaining = resp;
       if (cb) cb();
     });
