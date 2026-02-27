@@ -181,6 +181,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         authLogout().then(() => sendResponse({ ok: true }));
         return true;
     }
+    if (message.type === 'SUBMIT_REPORT') {
+        (async () => {
+            try {
+                const token = await getStoredToken();
+                if (!token) return sendResponse({ error: 'Not signed in' });
+                const resp = await fetch(`${API_BASE}/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...buildAuthHeaders(token) },
+                    body: JSON.stringify(message.data),
+                });
+                const data = await resp.json();
+                if (!resp.ok) return sendResponse({ error: data.detail || `Error ${resp.status}` });
+                sendResponse(data);
+            } catch (err) {
+                sendResponse({ error: err.message });
+            }
+        })();
+        return true;
+    }
+    if (message.type === 'GET_REPORT_REMAINING') {
+        (async () => {
+            try {
+                const token = await getStoredToken();
+                if (!token) return sendResponse({ remaining: 0, limit: 3 });
+                const resp = await fetch(`${API_BASE}/report/remaining`, {
+                    headers: buildAuthHeaders(token),
+                });
+                const data = await resp.json();
+                if (!resp.ok) return sendResponse({ remaining: 0, limit: 3 });
+                sendResponse(data);
+            } catch {
+                sendResponse({ remaining: 0, limit: 3 });
+            }
+        })();
+        return true;
+    }
     if (message.type === 'GET_STATS') {
         // Calculate metrics
         const cacheHitRate = stats.totalChecks > 0 

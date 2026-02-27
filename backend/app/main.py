@@ -14,6 +14,7 @@ from app.api.whitelist import router as whitelist_router
 from app.api.analyze import router as analyze_router
 from app.api.check import router as check_router
 from app.api.auth import router as auth_router
+from app.api.report import router as report_router
 
 # Initialize logging with file output and JSON format
 setup_logging(log_file="logs/api.log", json_logs=True)
@@ -34,7 +35,7 @@ async def verify_api_key(request: Request, call_next):
     """Verify API key for /check and /analyze endpoints."""
     path = request.url.path
     # Only protect API endpoints, not health checks
-    protected_paths = ["/check", "/analyze", "/whitelist", "/auth"]
+    protected_paths = ["/check", "/analyze", "/whitelist", "/auth", "/report"]
     needs_auth = any(path.startswith(p) for p in protected_paths)
 
     if needs_auth and ADORA_API_KEY:
@@ -106,6 +107,7 @@ app.include_router(whitelist_router)
 app.include_router(analyze_router)
 app.include_router(check_router)
 app.include_router(auth_router)
+app.include_router(report_router)
 
 # CORS for Chrome extension
 app.add_middleware(

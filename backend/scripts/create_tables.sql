@@ -1,5 +1,5 @@
 -- Adora DB schema (PostgreSQL 14)
--- 6 tables: scraping pipeline → analysis pipeline → extension lookup + users
+-- 7 tables: scraping pipeline → analysis pipeline → extension lookup + users + community reports
 
 -- ============================================================
 -- 1. meta_ads_daily — all scraped ads, deduped by unique key
@@ -111,3 +111,18 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- ============================================================
+-- 7. community_reports — user-submitted suspicious site reports
+-- ============================================================
+CREATE TABLE IF NOT EXISTS community_reports (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    reported_url TEXT NOT NULL,
+    cheaper_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'pending'
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_user ON community_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON community_reports(status);
