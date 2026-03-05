@@ -142,15 +142,19 @@ async function googleSignIn() {
             body: JSON.stringify({ google_token: googleToken }),
         });
 
+        log('INFO', `Auth backend call: ${resp.status}`);
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
+            log('ERROR', `Auth backend error: ${JSON.stringify(err)}`);
             return { error: err.detail || `Auth failed (${resp.status})` };
         }
 
         const data = await resp.json();
+        log('INFO', `Auth response keys: ${Object.keys(data)}`);
         // Save token in background so it persists even if content script tab is gone
         if (data.access_token && data.user) {
             chrome.storage.local.set({ adoraAccessToken: data.access_token, adoraUser: data.user });
+            log('INFO', `Auth saved for ${data.user.email}`);
         }
         return data;
     } catch (err) {
