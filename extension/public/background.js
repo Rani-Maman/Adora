@@ -147,7 +147,12 @@ async function googleSignIn() {
             return { error: err.detail || `Auth failed (${resp.status})` };
         }
 
-        return await resp.json();
+        const data = await resp.json();
+        // Save token in background so it persists even if content script tab is gone
+        if (data.access_token && data.user) {
+            chrome.storage.local.set({ adoraAccessToken: data.access_token, adoraUser: data.user });
+        }
+        return data;
     } catch (err) {
         log('ERROR', `Google sign-in failed: ${err.message}`);
         // User closed popup or other cancellation
