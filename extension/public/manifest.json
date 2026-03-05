@@ -1,5 +1,6 @@
 {
     "manifest_version": 3,
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuEc1yXuLI4gb3a0T/dT+CBUUv1tf5i2fmqcwJHIFCU3q1SlCKhg1NJs9XioSTV2O8xAnSGT7ZUbXIIMzbKdm6JtcVMZNMO6xvD4YZ+DBYaH6quzN4Kzv4T4XjAULzRYhbp0shVV8wjfbqUqQGuoxAvOgKn1+kP1Nd5Yo6C1tXWZm7/+I0G20ewPXmgqdTnaDPwAZXRoyMmSwRBjv8byvHr/qtoZaq3VksOsgqzJearIQebBUV7qQIJQnULV6oXhIQ37y65GULKB1mcGz8lC/1ejqg/i2d7aoFdX2XzmIymkfKU9LIrjS20PUybLzc0eH12Oha7CKlJHRQdX9lPIyRwIDAQAB",
     "name": "Adora - Dropship Detector",
     "version": "1.0.0",
     "description": "Warns you when visiting potential dropshipping sites in Israel",

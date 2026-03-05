@@ -117,7 +117,7 @@ async function googleSignIn() {
         // Build Google OAuth URL for launchWebAuthFlow
         const redirectUri = chrome.identity.getRedirectURL();
         const scopes = encodeURIComponent('openid email profile');
-        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=consent`;
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account%20consent`;
 
         const responseUrl = await chrome.identity.launchWebAuthFlow({
             url: authUrl,
