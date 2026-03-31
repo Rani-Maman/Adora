@@ -66,7 +66,7 @@ async def check_url(url: str = Query(..., description="URL to check")):
         # Query risk_db for exact domain match
         cursor.execute(
             """
-            SELECT base_url, risk_score, evidence, advertiser_name, first_seen, price_matches
+            SELECT id, base_url, risk_score, evidence, advertiser_name, first_seen, price_matches
             FROM risk_db
             WHERE LOWER(TRIM(base_url)) = LOWER(%s)
             LIMIT 1
@@ -84,21 +84,22 @@ async def check_url(url: str = Query(..., description="URL to check")):
                 "Domain lookup: RISKY",
                 extra={
                     "domain": domain,
-                    "risk_score": float(result[1]) if result[1] else 0.0,
+                    "risk_score": float(result[2]) if result[2] else 0.0,
                     "query_time_ms": round(query_time * 1000, 2),
                     "found": True,
                 }
             )
             # Parse price_matches — psycopg2 returns JSONB as Python objects
-            price_matches = result[5] if result[5] else []
+            price_matches = result[6] if result[6] else []
 
             return {
                 "risky": True,
-                "domain": result[0],
-                "score": float(result[1]) if result[1] else 0.0,
-                "evidence": result[2] if result[2] else [],
-                "advertiser": result[3] if result[3] else None,
-                "first_seen": str(result[4]) if result[4] else None,
+                "risk_db_id": result[0],
+                "domain": result[1],
+                "score": float(result[2]) if result[2] else 0.0,
+                "evidence": result[3] if result[3] else [],
+                "advertiser": result[4] if result[4] else None,
+                "first_seen": str(result[5]) if result[5] else None,
                 "price_matches": price_matches,
             }
 

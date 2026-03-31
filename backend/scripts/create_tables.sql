@@ -1,5 +1,5 @@
 -- Adora DB schema (PostgreSQL 14)
--- 7 tables: scraping pipeline → analysis pipeline → extension lookup + users + community reports
+-- 8 tables: scraping pipeline → analysis pipeline → extension lookup + users + feedback + community reports
 
 -- ============================================================
 -- 1. meta_ads_daily — all scraped ads, deduped by unique key
@@ -113,7 +113,27 @@ CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- ============================================================
--- 7. community_reports — user-submitted suspicious site reports
+-- 7. site_feedback — one vote per user per risky site
+-- ============================================================
+CREATE TABLE IF NOT EXISTS site_feedback (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    risk_db_id INTEGER NOT NULL REFERENCES risk_db(id) ON DELETE CASCADE,
+    vote TEXT,
+    reason TEXT,
+    switch_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT site_feedback_one_vote_per_user UNIQUE (user_id, risk_db_id),
+    CONSTRAINT site_feedback_vote_check CHECK (vote IN ('like', 'dislike') OR vote IS NULL),
+    CONSTRAINT site_feedback_reason_check CHECK (vote = 'dislike' OR reason IS NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_feedback_user ON site_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_risk ON site_feedback(risk_db_id);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_risk_vote ON site_feedback(risk_db_id, vote);
+
+-- ============================================================
+-- 8. community_reports — user-submitted suspicious site reports
 -- ============================================================
 CREATE TABLE IF NOT EXISTS community_reports (
     id SERIAL PRIMARY KEY,

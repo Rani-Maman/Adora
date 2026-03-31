@@ -38,15 +38,20 @@ chrome.storage.local.get(['adoraCache', 'adoraStats'], (result) => {
         const entries = Object.entries(result.adoraCache);
         const now = Date.now();
         let expired = 0;
-        // Filter out expired entries
+        let stale = 0;
         entries.forEach(([domain, data]) => {
             if (data.timestamp && (now - data.timestamp) < CACHE_TTL_MS) {
-                cache.set(domain, data);
+                if (data.risky && !data.risk_db_id) {
+                    stale++;
+                } else {
+                    cache.set(domain, data);
+                }
             } else {
                 expired++;
             }
         });
-        console.log(`[Adora] INFO: Loaded ${cache.size} cached domains (${expired} expired)`);
+        if (stale > 0) saveCache();
+        console.log(`[Adora] INFO: Loaded ${cache.size} cached domains (${expired} expired, ${stale} stale)`);
     }
     
     if (result.adoraStats) {
@@ -181,6 +186,34 @@ async function authLogout() {
     }
 }
 
+async function getFeedback(riskDbId) {
+    const token = await getStoredToken();
+    if (!token) return { error: 'Not signed in' };
+
+    const resp = await fetch(`${API_BASE}/feedback/${encodeURIComponent(riskDbId)}`, {
+        headers: buildAuthHeaders(token),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.status === 401) return handleExpiredToken();
+    if (!resp.ok) return { error: data.detail || `Error ${resp.status}` };
+    return data;
+}
+
+async function submitFeedback(data) {
+    const token = await getStoredToken();
+    if (!token) return { error: 'Not signed in' };
+
+    const resp = await fetch(`${API_BASE}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders(token) },
+        body: JSON.stringify(data),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (resp.status === 401) return handleExpiredToken();
+    if (!resp.ok) return { error: payload.detail || `Error ${resp.status}` };
+    return payload;
+}
+
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CHECK_URL') {
@@ -233,6 +266,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         })();
         return true;
     }
+    if (message.type === 'GET_FEEDBACK') {
+        getFeedback(message.riskDbId).then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+        return true;
+    }
+    if (message.type === 'SUBMIT_FEEDBACK') {
+        submitFeedback(message.data).then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+        return true;
+    }
     if (message.type === 'GET_STATS') {
         // Calculate metrics
         const cacheHitRate = stats.totalChecks > 0 
@@ -274,7 +315,8 @@ async function checkUrl(url, tabId) {
             const cached = cache.get(domain);
             const age = Date.now() - (cached.timestamp || 0);
             const ttl = cached.risky ? CACHE_TTL_MS : CACHE_TTL_SAFE_MS;
-            if (age < ttl) {
+            const needsRefresh = cached.risky && !cached.risk_db_id;
+            if (age < ttl && !needsRefresh) {
                 stats.cacheHits++;
                 const ageHours = Math.round(age / (1000 * 60 * 60));
                 log('INFO', `Cache hit: ${domain}`, { 

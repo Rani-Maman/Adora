@@ -12,7 +12,7 @@ const envPath = join(__dirname, '.env');
 const env = {};
 
 if (existsSync(envPath)) {
-    const envContent = readFileSync(envPath, 'utf-8');
+    const envContent = readFileSync(envPath, 'utf-8').replace(/^\uFEFF/, '').replace(/\r/g, '');
     envContent.split('\n').forEach(line => {
         // Skip comments and empty lines
         if (line.trim().startsWith('#') || !line.trim()) return;
