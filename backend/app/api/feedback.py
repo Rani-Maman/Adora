@@ -151,17 +151,7 @@ async def submit_feedback(body: FeedbackRequest, request: Request, user: dict = 
         else:
             current_vote, switch_count = existing
             if current_vote == requested_vote:
-                cur.execute(
-                    "UPDATE site_feedback SET vote = NULL, reason = NULL WHERE user_id = %s AND risk_db_id = %s",
-                    (user_id, body.risk_db_id),
-                )
-                action = "cleared"
-            elif current_vote is None:
-                cur.execute(
-                    "UPDATE site_feedback SET vote = %s, reason = %s WHERE user_id = %s AND risk_db_id = %s",
-                    (requested_vote, reason, user_id, body.risk_db_id),
-                )
-                action = "set"
+                action = "no_change"
             else:
                 if switch_count >= MAX_SWITCHES:
                     raise HTTPException(status_code=429, detail="Vote switch limit reached for this site")

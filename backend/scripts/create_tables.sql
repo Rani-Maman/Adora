@@ -119,12 +119,12 @@ CREATE TABLE IF NOT EXISTS site_feedback (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     risk_db_id INTEGER NOT NULL REFERENCES risk_db(id) ON DELETE CASCADE,
-    vote TEXT,
+    vote TEXT NOT NULL,
     reason TEXT,
     switch_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT site_feedback_one_vote_per_user UNIQUE (user_id, risk_db_id),
-    CONSTRAINT site_feedback_vote_check CHECK (vote IN ('like', 'dislike') OR vote IS NULL),
+    CONSTRAINT site_feedback_vote_check CHECK (vote IN ('like', 'dislike')),
     CONSTRAINT site_feedback_reason_check CHECK (vote = 'dislike' OR reason IS NULL)
 );
 
