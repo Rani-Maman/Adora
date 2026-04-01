@@ -57,6 +57,27 @@
       eduIntro: 'Adora automatically checks shopping sites you visit and alerts you if they appear to be dropshipping - selling products at inflated prices from suppliers like AliExpress or Temu.<br>When a site is flagged, we automatically search for the same product at a lower price so you always get the best deal.',
       whatIsAdora: 'What is Adora?',
       contactUs: 'Contact Us',
+      foundHelpful: 'found this helpful',
+      foundUnhelpful: 'marked this unhelpful',
+      tellUsWhy: 'Tell us why (optional)',
+      feedbackPlaceholder: 'What could be better?',
+      feedbackSend: 'Send',
+      feedbackSkip: 'Skip',
+      feedbackThanks: 'Thanks for your feedback!',
+      feedbackSignIn: 'Sign in to vote',
+      feedbackError: 'Could not save your vote',
+      feedbackLimit: 'You reached the vote-switch limit for this site',
+      savedBadge: 'saved',
+      youJustSaved: 'You just saved',
+      withAdora: 'with Adora!',
+      milestone: 'Milestone!',
+      topShopper: 'You\'re a top smart shopper',
+      keepSaving: 'Keep saving',
+      shareSavings: 'Share on WhatsApp',
+      monthlySummary: 'Your Summary',
+      sitesChecked: 'Sites checked',
+      riskySites: 'Risky sites found',
+      moneySaved: 'Money saved',
     },
     he: {
       signIn: '\u05D4\u05EA\u05D7\u05D1\u05E8\u05D5\u05EA \u05E2\u05DD Google', signOut: '\u05D4\u05EA\u05E0\u05EA\u05E7',
@@ -83,6 +104,27 @@
       eduIntro: 'Adora \u05D1\u05D5\u05D3\u05E7\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D0\u05EA\u05E8\u05D9 \u05E7\u05E0\u05D9\u05D5\u05EA \u05E9\u05D0\u05EA\u05DD \u05DE\u05D1\u05E7\u05E8\u05D9\u05DD \u05D1\u05D4\u05DD \u05D5\u05DE\u05EA\u05E8\u05D9\u05E2\u05D4 \u05D0\u05DD \u05D4\u05DD \u05E0\u05E8\u05D0\u05D9\u05DD \u05DB\u05D0\u05EA\u05E8\u05D9 \u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2 - \u05E9\u05DE\u05D5\u05DB\u05E8\u05D9\u05DD \u05DE\u05D5\u05E6\u05E8\u05D9\u05DD \u05D1\u05DE\u05D7\u05D9\u05E8\u05D9\u05DD \u05DE\u05E0\u05D5\u05E4\u05D7\u05D9\u05DD \u05DE\u05E1\u05E4\u05E7\u05D9\u05DD \u05DB\u05DE\u05D5 AliExpress \u05D0\u05D5 Temu.<br>\u05DB\u05E9\u05D0\u05EA\u05E8 \u05DE\u05E1\u05D5\u05DE\u05DF, \u05D0\u05E0\u05D7\u05E0\u05D5 \u05DE\u05D7\u05E4\u05E9\u05D9\u05DD \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D0\u05EA \u05D0\u05D5\u05EA\u05D5 \u05DE\u05D5\u05E6\u05E8 \u05D1\u05DE\u05D7\u05D9\u05E8 \u05D6\u05D5\u05DC \u05D9\u05D5\u05EA\u05E8 \u05DB\u05D3\u05D9 \u05E9\u05EA\u05DE\u05D9\u05D3 \u05EA\u05E7\u05D1\u05DC\u05D5 \u05D0\u05EA \u05D4\u05E2\u05E1\u05E7\u05D4 \u05D4\u05D8\u05D5\u05D1\u05D4 \u05D1\u05D9\u05D5\u05EA\u05E8.',
       whatIsAdora: '\u05DE\u05D4 \u05D6\u05D4 Adora?',
       contactUs: '\u05E6\u05D5\u05E8 \u05E7\u05E9\u05E8',
+      foundHelpful: '\u05DE\u05E6\u05D0\u05D5 \u05D0\u05EA \u05D6\u05D4 \u05DE\u05D5\u05E2\u05D9\u05DC',
+      foundUnhelpful: '\u05E1\u05D9\u05DE\u05E0\u05D5 \u05D0\u05EA \u05D6\u05D4 \u05DB\u05DC\u05D0 \u05DE\u05D5\u05E2\u05D9\u05DC',
+      tellUsWhy: '\u05E1\u05E4\u05E8\u05D5 \u05DC\u05E0\u05D5 \u05DC\u05DE\u05D4 (\u05D0\u05D5\u05E4\u05E6\u05D9\u05D5\u05E0\u05DC\u05D9)',
+      feedbackPlaceholder: '\u05DE\u05D4 \u05D0\u05E4\u05E9\u05E8 \u05DC\u05E9\u05E4\u05E8?',
+      feedbackSend: '\u05E9\u05DC\u05D7',
+      feedbackSkip: '\u05D3\u05DC\u05D2',
+      feedbackThanks: '\u05EA\u05D5\u05D3\u05D4 \u05E2\u05DC \u05D4\u05DE\u05E9\u05D5\u05D1!',
+      feedbackSignIn: '\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DB\u05D3\u05D9 \u05DC\u05D4\u05E6\u05D1\u05D9\u05E2',
+      feedbackError: '\u05DC\u05D0 \u05D4\u05E6\u05DC\u05D7\u05E0\u05D5 \u05DC\u05E9\u05DE\u05D5\u05E8 \u05D0\u05EA \u05D4\u05D4\u05E6\u05D1\u05E2\u05D4',
+      feedbackLimit: '\u05D4\u05D2\u05E2\u05EA \u05DC\u05DE\u05D2\u05D1\u05DC\u05EA \u05D4\u05D7\u05DC\u05E4\u05D5\u05EA \u05E2\u05D1\u05D5\u05E8 \u05D0\u05EA\u05E8 \u05D6\u05D4',
+      savedBadge: '\u05E0\u05D7\u05E1\u05DA',
+      youJustSaved: '\u05D7\u05E1\u05DB\u05EA \u05D6\u05D4 \u05E2\u05EA\u05D4',
+      withAdora: '!Adora \u05E2\u05DD',
+      milestone: '!Milestone',
+      topShopper: '\u05D0\u05EA\u05D4 \u05E7\u05D5\u05E0\u05D4 \u05D7\u05DB\u05DD',
+      keepSaving: '\u05D4\u05DE\u05E9\u05DA \u05DC\u05D7\u05E1\u05D5\u05DA',
+      shareSavings: '\u05E9\u05EA\u05E3 \u05D1\u05D5\u05D5\u05D0\u05D8\u05E1\u05D0\u05E4',
+      monthlySummary: '\u05D4\u05E1\u05D9\u05DB\u05D5\u05DD \u05E9\u05DC\u05DA',
+      sitesChecked: '\u05D0\u05EA\u05E8\u05D9\u05DD \u05E0\u05D1\u05D3\u05E7\u05D5',
+      riskySites: '\u05D0\u05EA\u05E8\u05D9\u05DD \u05DE\u05E1\u05D5\u05DB\u05E0\u05D9\u05DD',
+      moneySaved: '\u05DB\u05E1\u05E3 \u05E9\u05E0\u05D7\u05E1\u05DA',
     }
   };
 
@@ -163,7 +205,57 @@
   let authUser = null, authLoading = false;
   let reportRemaining = null; // { remaining: int, limit: int }
   let widgetPos = null; // { x, y }
+  let feedbackState = {
+    likes: 0,
+    dislikes: 0,
+    userVote: null,
+    switchCount: 0,
+    switchesRemaining: 3,
+    loaded: false,
+    loading: false,
+  };
+  let feedbackBubbleOpen = false;
+  let savingsData = { total: 0, monthly: {}, history: [], milestones: [] };
+  let currentSiteSavings = 0;
+  const MILESTONES = [100, 500, 1000, 2500, 5000, 10000];
   const logoUrl = chrome.runtime.getURL('icons/icon48.png');
+
+  function calculateSiteSavings(result) {
+    const matches = getPriceMatches(result);
+    let total = 0;
+    for (const pm of matches) {
+      if (pm.sitePrice > 0 && pm.sources.length > 0) {
+        const cheapest = pm.sources[0].price;
+        if (cheapest > 0 && pm.sitePrice > cheapest) {
+          total += pm.sitePrice - cheapest;
+        }
+      }
+    }
+    return Math.round(total);
+  }
+
+  function recordSavings(amount) {
+    if (amount <= 0) return;
+    const month = new Date().toISOString().slice(0, 7);
+    const domain = location.hostname;
+    const already = savingsData.history.find(h => h.domain === domain);
+    if (already) return;
+    savingsData.total += amount;
+    savingsData.monthly[month] = (savingsData.monthly[month] || 0) + amount;
+    savingsData.history.push({ domain, saved: amount, date: new Date().toISOString().slice(0, 10) });
+    chrome.storage.local.set({ adoraSavings: savingsData });
+  }
+
+  function checkMilestone() {
+    for (const m of MILESTONES) {
+      if (savingsData.total >= m && !savingsData.milestones.includes(m)) {
+        savingsData.milestones.push(m);
+        chrome.storage.local.set({ adoraSavings: savingsData });
+        return m;
+      }
+    }
+    return null;
+  }
 
   // ====== CSS ======
   function buildCSS(t) {
@@ -224,7 +316,7 @@
       .header-btn.close:hover { border-color: ${t.danger}; color: ${t.danger}; }
 
       /* Body */
-      .body { padding: 14px; overflow-y: auto; max-height: calc(80vh - 50px); -webkit-user-select: text; user-select: text; cursor: text; }
+      .body { padding: 14px; overflow-y: auto; max-height: calc(80vh - 90px); -webkit-user-select: text; user-select: text; cursor: text; }
 
       /* Auth */
       .auth-bar {
@@ -448,6 +540,205 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       .loading { text-align: center; padding: 20px 0; }
       .loading-text { color: ${t.textMuted}; font-size: 12px; }
+
+      /* Feedback bar — inline between product cards and disclaimer */
+      .feedback-bar {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px;
+        margin: 10px 0 2px;
+        border-radius: 10px;
+        background: ${t.bgSec};
+        border: 1px solid ${t.border};
+        position: relative;
+      }
+      .feedback-btn {
+        display: flex; align-items: center; gap: 6px;
+        background: none; border: 1.5px solid transparent; cursor: pointer;
+        padding: 5px 12px; border-radius: 20px;
+        transition: all 0.18s ease;
+        font-size: 13px;
+      }
+      .feedback-btn:hover { background: ${t.bgHover}; border-color: ${t.border}; }
+      .feedback-btn:disabled { opacity: 0.5; pointer-events: none; }
+      .feedback-emoji {
+        font-size: 18px; line-height: 1;
+        filter: grayscale(30%); transition: all 0.2s ease;
+      }
+      .feedback-btn:hover .feedback-emoji { filter: none; transform: scale(1.12); }
+      .feedback-btn.active .feedback-emoji {
+        filter: none;
+        text-shadow: 0 0 8px ${t.accent}60;
+      }
+      .feedback-btn.active {
+        background: ${t.accentLight};
+        border-color: ${t.accent}40;
+      }
+      .feedback-count {
+        font-size: 12px; color: ${t.textMuted}; white-space: nowrap;
+        user-select: none;
+      }
+      .feedback-likes-label {
+        font-size: 12px; color: ${t.textSec};
+        margin-${isRtl ? 'right' : 'left'}: auto;
+        user-select: none;
+      }
+
+      /* Dislike feedback bubble */
+      .feedback-bubble {
+        position: absolute; bottom: 100%; ${isRtl ? 'left' : 'right'}: 0;
+        margin-bottom: 8px;
+        background: ${t.bgCard}; border: 1px solid ${t.border};
+        border-radius: 10px; padding: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        width: 220px; z-index: 10;
+        animation: fadeInUp 0.2s ease;
+      }
+      .feedback-bubble::after {
+        content: ''; position: absolute; top: 100%;
+        ${isRtl ? 'left' : 'right'}: 20px;
+        border: 6px solid transparent;
+        border-top-color: ${t.bgCard};
+      }
+      .feedback-bubble-title {
+        font-size: 12px; font-weight: 600; color: ${t.text};
+        display: block; margin-bottom: 8px;
+      }
+      .feedback-textarea {
+        width: 100%; padding: 7px 10px; font-size: 12px; border-radius: 6px;
+        border: 1px solid ${t.border}; background: ${t.bg}; color: ${t.text};
+        outline: none; margin-bottom: 8px; resize: vertical; min-height: 44px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        direction: ${isRtl ? 'rtl' : 'ltr'};
+      }
+      .feedback-textarea:focus { border-color: ${t.accent}; }
+      .feedback-textarea::placeholder { color: ${t.textMuted}; }
+      .feedback-bubble-actions {
+        display: flex; align-items: center; gap: 8px;
+      }
+      .feedback-send-btn {
+        padding: 5px 14px; border: none; border-radius: 6px;
+        background: ${t.accent}; color: ${t.accentText};
+        font-size: 12px; font-weight: 600; cursor: pointer;
+        transition: background 0.15s;
+      }
+      .feedback-send-btn:hover { background: ${t.accentHover}; }
+      .feedback-skip-btn {
+        background: none; border: none; color: ${t.textMuted};
+        font-size: 12px; cursor: pointer; padding: 5px 8px;
+        transition: color 0.15s;
+      }
+      .feedback-skip-btn:hover { color: ${t.text}; }
+
+      /* Feedback toast */
+      .feedback-toast {
+        position: absolute; bottom: 100%; left: 50%;
+        transform: translateX(-50%);
+        background: ${t.accent}; color: ${t.accentText};
+        padding: 6px 14px; border-radius: 8px;
+        font-size: 12px; font-weight: 500; white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: fadeInUp 0.2s ease;
+        pointer-events: none;
+      }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+
+      /* Savings badge in header */
+      .savings-badge {
+        display: flex; align-items: center; gap: 4px;
+        background: ${t.safeBg}; border: 1px solid ${t.safe};
+        border-radius: 12px; padding: 2px 8px;
+        font-size: 11px; font-weight: 700; color: ${t.safe};
+        white-space: nowrap; animation: badgePop 0.4s ease;
+      }
+      .savings-badge-icon { font-size: 13px; }
+      @keyframes badgePop {
+        0% { transform: scale(0.8); opacity: 0; }
+        60% { transform: scale(1.1); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      /* Savings badge pulse when value changes */
+      .savings-badge.pulse {
+        animation: badgePulse 0.6s ease;
+      }
+      @keyframes badgePulse {
+        0% { transform: scale(1); }
+        30% { transform: scale(1.15); box-shadow: 0 0 8px ${t.safe}40; }
+        100% { transform: scale(1); }
+      }
+
+      /* Milestone overlay — clean and minimal */
+      .milestone-overlay {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.4);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999; border-radius: 12px;
+        animation: fadeIn 0.3s ease;
+      }
+      .milestone-card {
+        background: ${t.bgCard}; border-radius: 12px; padding: 20px;
+        text-align: center; width: 80%; max-width: 280px;
+        border: 1px solid ${t.border};
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        animation: milestoneIn 0.4s ease;
+      }
+      .milestone-emoji { font-size: 28px; margin-bottom: 6px; display: block; }
+      .milestone-title {
+        font-size: 13px; font-weight: 600; color: ${t.textSec};
+        margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase;
+      }
+      .milestone-amount {
+        font-size: 24px; font-weight: 800; color: ${t.safe};
+        margin: 6px 0;
+      }
+      .milestone-subtitle {
+        font-size: 12px; color: ${t.textMuted}; margin-bottom: 14px;
+      }
+      .milestone-actions { display: flex; gap: 8px; justify-content: center; }
+      .milestone-btn {
+        padding: 7px 14px; border-radius: 8px; border: none;
+        font-size: 11px; font-weight: 600; cursor: pointer;
+        transition: all 0.15s;
+      }
+      .milestone-btn.primary {
+        background: #25D366; color: #fff;
+      }
+      .milestone-btn.primary:hover { background: #1ebe5a; }
+      .milestone-btn.secondary {
+        background: ${t.bg}; color: ${t.textSec}; border: 1px solid ${t.border};
+      }
+      .milestone-btn.secondary:hover { background: ${t.bgHover}; }
+      @keyframes milestoneIn {
+        from { opacity: 0; transform: scale(0.95) translateY(8px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; } to { opacity: 1; }
+      }
+
+      /* Monthly summary card */
+      .summary-card {
+        background: linear-gradient(135deg, ${t.accentLight}, ${t.bgSec});
+        border: 1px solid ${t.border}; border-radius: 10px;
+        padding: 14px; margin-bottom: 10px;
+      }
+      .summary-title {
+        font-size: 14px; font-weight: 700; color: ${t.text};
+        margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+      }
+      .summary-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 4px 0; font-size: 12px; color: ${t.textSec};
+      }
+      .summary-value { font-weight: 700; color: ${t.text}; font-size: 14px; }
+      .summary-value.highlight { color: ${t.safe}; font-size: 18px; }
+      .summary-divider {
+        border: none; border-top: 1px solid ${t.border};
+        margin: 8px 0;
+      }
     `;
   }
 
@@ -461,6 +752,7 @@
     html += `<div class="header" id="adora-header">
       <img src="${logoUrl}" alt="" class="header-logo">
       <span class="header-title">Adora</span>
+      ${savingsData.total > 0 ? `<span class="savings-badge"><span class="savings-badge-icon">\uD83D\uDCB0</span>\u20AA${savingsData.total} ${l.savedBadge}</span>` : ''}
       <span class="header-spacer"></span>
       <button class="header-btn lang" id="adora-lang">${curLang === 'en' ? '\u05E2\u05D1' : 'EN'}</button>
       <button class="header-btn theme" id="adora-theme">${curTheme === 'light' ? '\u263D' : '\u2600'}</button>
@@ -536,9 +828,40 @@
         html += '</div>';
       }
 
+      // Feedback bar — between product cards and disclaimer
+      const likes = feedbackState.likes || 0;
+      html += `<div class="feedback-bar" id="adora-feedback">
+        <button class="feedback-btn${feedbackState.userVote === 'like' ? ' active' : ''}" id="adora-like" title="Helpful" ${feedbackState.loading ? 'disabled' : ''}>
+          <span class="feedback-emoji">\uD83D\uDC4D</span>
+        </button>
+        <button class="feedback-btn${feedbackState.userVote === 'dislike' ? ' active' : ''}" id="adora-dislike" title="Not helpful" ${feedbackState.loading ? 'disabled' : ''}>
+          <span class="feedback-emoji">\uD83D\uDC4E</span>
+        </button>
+        ${likes > 0 ? `<span class="feedback-likes-label">${likes} ${l.foundHelpful}</span>` : ''}
+      </div>`;
+
       html += `<div class="disclaimer">${l.disclaimer}</div>`;
       html += '</div>'; // .alert
     } else {
+      // Monthly savings summary
+      if (savingsData.total > 0) {
+        const month = new Date().toISOString().slice(0, 7);
+        const monthSaved = savingsData.monthly[month] || 0;
+        const sitesCount = savingsData.history.length;
+        html += `<div class="summary-card">
+          <div class="summary-title">\uD83D\uDCC8 ${l.monthlySummary}</div>
+          <div class="summary-row">
+            <span>${l.riskySites}</span>
+            <span class="summary-value">${sitesCount}</span>
+          </div>
+          <hr class="summary-divider">
+          <div class="summary-row">
+            <span>${l.moneySaved}</span>
+            <span class="summary-value highlight">\u20AA${savingsData.total}</span>
+          </div>
+        </div>`;
+      }
+
       html += `<div class="edu-card">
         <div class="edu-body">${l.eduIntro}</div>
         <button class="edu-toggle" id="edu-toggle">
@@ -563,6 +886,7 @@
     }
 
     html += '</div>'; // .body
+
     return html;
   }
 
@@ -726,6 +1050,33 @@
       };
     }
 
+    // Feedback buttons
+    const likeBtn = shadow.getElementById('adora-like');
+    const dislikeBtn = shadow.getElementById('adora-dislike');
+    const feedbackBar = shadow.getElementById('adora-feedback');
+
+    if (likeBtn) likeBtn.onclick = () => {
+      if (!authUser) {
+        showFeedbackToast(feedbackBar, (i18n[curLang] || i18n.en).feedbackSignIn);
+        return;
+      }
+      submitFeedbackVote('like');
+    };
+
+    if (dislikeBtn) dislikeBtn.onclick = () => {
+      if (!authUser) {
+        showFeedbackToast(feedbackBar, (i18n[curLang] || i18n.en).feedbackSignIn);
+        return;
+      }
+      if (feedbackState.loading) return;
+      if (feedbackState.userVote === 'dislike') {
+        submitFeedbackVote('dislike');
+        return;
+      }
+      feedbackBubbleOpen = true;
+      showDislikeBubble();
+    };
+
     const infoBtn = shadow.getElementById('dropship-info-btn');
     if (infoBtn) infoBtn.onclick = () => {
       const l = i18n[curLang];
@@ -744,6 +1095,174 @@
       pill.onclick = () => { expanded = true; render(); };
       setupDrag(pill);
     }
+  }
+
+  // ====== Feedback Helpers ======
+  function showDislikeBubble() {
+    const feedbackBar = shadow.getElementById('adora-feedback');
+    if (!feedbackBar) return;
+    const existing = feedbackBar.querySelector('.feedback-bubble');
+    if (existing) existing.remove();
+
+    const l = i18n[curLang] || i18n.en;
+    const bubble = document.createElement('div');
+    bubble.className = 'feedback-bubble';
+    bubble.innerHTML = `
+      <span class="feedback-bubble-title">${l.tellUsWhy}</span>
+      <textarea class="feedback-textarea" id="adora-dislike-reason"
+        placeholder="${l.feedbackPlaceholder}" rows="2"></textarea>
+      <div class="feedback-bubble-actions">
+        <button class="feedback-send-btn" id="adora-dislike-send">${l.feedbackSend}</button>
+        <button class="feedback-skip-btn" id="adora-dislike-skip">${l.feedbackSkip}</button>
+      </div>`;
+
+    bubble.onclick = (e) => e.stopPropagation();
+    feedbackBar.appendChild(bubble);
+
+    const sendBtn = bubble.querySelector('#adora-dislike-send');
+    const skipBtn = bubble.querySelector('#adora-dislike-skip');
+
+    function submitDislike(reason) {
+      submitFeedbackVote('dislike', reason);
+    }
+
+    if (sendBtn) sendBtn.onclick = () => {
+      const reason = bubble.querySelector('#adora-dislike-reason')?.value?.trim() || '';
+      submitDislike(reason);
+    };
+    if (skipBtn) skipBtn.onclick = () => submitDislike('');
+  }
+
+  function showMilestone(amount) {
+    if (!widgetContainer) return;
+    const l = i18n[curLang] || i18n.en;
+    const overlay = document.createElement('div');
+    overlay.className = 'milestone-overlay';
+    overlay.innerHTML = `<div class="milestone-card">
+      <span class="milestone-emoji">\u2728</span>
+      <div class="milestone-title">${l.milestone}</div>
+      <div class="milestone-amount">\u20AA${amount.toLocaleString()}</div>
+      <div class="milestone-subtitle">${l.topShopper}</div>
+      <div class="milestone-actions">
+        <button class="milestone-btn primary" id="milestone-share">${l.shareSavings}</button>
+        <button class="milestone-btn secondary" id="milestone-close">${l.keepSaving}</button>
+      </div>
+    </div>`;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    widgetContainer.appendChild(overlay);
+
+    const shareBtn = overlay.querySelector('#milestone-share');
+    const closeBtn = overlay.querySelector('#milestone-close');
+    if (shareBtn) shareBtn.onclick = () => {
+      const text = curLang === 'he'
+        ? `\u05D7\u05E1\u05DB\u05EA\u05D9 \u20AA${amount.toLocaleString()} \u05E2\u05DD Adora! \u05D4\u05EA\u05D5\u05E1\u05E3 \u05E9\u05E2\u05D5\u05D6\u05E8 \u05DC\u05DA \u05DC\u05D4\u05D9\u05DE\u05E0\u05E2 \u05DE\u05D0\u05EA\u05E8\u05D9 \u05D3\u05E8\u05D5\u05E4\u05E9\u05D9\u05E4\u05D9\u05E0\u05D2`
+        : `I saved \u20AA${amount.toLocaleString()} with Adora! The extension that protects you from dropshipping sites`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      overlay.remove();
+    };
+    if (closeBtn) closeBtn.onclick = () => overlay.remove();
+  }
+
+  function showFeedbackToast(container, message) {
+    if (!container) return;
+    const existing = container.querySelector('.feedback-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'feedback-toast';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 2000);
+  }
+
+  function resetFeedbackState() {
+    feedbackState = {
+      likes: 0,
+      dislikes: 0,
+      userVote: null,
+      switchCount: 0,
+      switchesRemaining: 3,
+      loaded: false,
+      loading: false,
+    };
+  }
+
+  function applyFeedbackState(data) {
+    feedbackState = {
+      likes: data?.likes || 0,
+      dislikes: data?.dislikes || 0,
+      userVote: data?.user_vote || null,
+      switchCount: data?.switch_count || 0,
+      switchesRemaining: data?.switches_remaining ?? 3,
+      loaded: true,
+      loading: false,
+    };
+  }
+
+  function fetchFeedback(cb) {
+    if (!authUser || !siteIsRisky || !siteResult?.risk_db_id) {
+      resetFeedbackState();
+      if (cb) cb();
+      return;
+    }
+
+    feedbackState = { ...feedbackState, loading: true };
+    chrome.runtime.sendMessage({ type: 'GET_FEEDBACK', riskDbId: siteResult.risk_db_id }, (resp) => {
+      if (resp?.error === 'session_expired') {
+        authUser = null;
+        resetFeedbackState();
+        render();
+        return;
+      }
+      if (resp && !resp.error) applyFeedbackState(resp);
+      else feedbackState = { ...feedbackState, loading: false };
+      if (cb) cb(resp);
+    });
+  }
+
+  function submitFeedbackVote(vote, reason = '') {
+    const feedbackBar = shadow?.getElementById('adora-feedback');
+    const l = i18n[curLang] || i18n.en;
+
+    if (!authUser) {
+      showFeedbackToast(feedbackBar, l.feedbackSignIn);
+      return;
+    }
+    if (!siteResult?.risk_db_id || feedbackState.loading) return;
+
+    feedbackState = { ...feedbackState, loading: true };
+    render();
+
+    chrome.runtime.sendMessage({
+      type: 'SUBMIT_FEEDBACK',
+      data: { risk_db_id: siteResult.risk_db_id, vote, reason }
+    }, (resp) => {
+      if (resp?.error === 'session_expired') {
+        authUser = null;
+        resetFeedbackState();
+        render();
+        return;
+      }
+
+      if (resp?.ok) {
+        applyFeedbackState(resp);
+        feedbackBubbleOpen = false;
+        render();
+        showFeedbackToast(shadow.getElementById('adora-feedback'), l.feedbackThanks);
+        return;
+      }
+
+      feedbackState = { ...feedbackState, loading: false };
+      feedbackBubbleOpen = false;
+      render();
+      const message = resp?.error?.includes('limit') ? l.feedbackLimit : (resp?.error || l.feedbackError);
+      showFeedbackToast(shadow.getElementById('adora-feedback'), message);
+    });
+  }
+
+  function ensureFeedbackLoaded() {
+    if (!authUser || !siteIsRisky) return;
+    if (feedbackState.loaded || feedbackState.loading) return;
+    fetchFeedback(() => render());
   }
 
   // ====== Drag ======
@@ -815,7 +1334,8 @@
         });
         authUser = resp.user;
       }
-      render();
+      if (siteIsRisky && authUser) fetchFeedback(() => render());
+      else render();
     });
   }
 
@@ -823,6 +1343,7 @@
     chrome.runtime.sendMessage({ type: 'AUTH_LOGOUT' });
     chrome.storage.local.remove(['adoraAccessToken', 'adoraUser']);
     authUser = null;
+    resetFeedbackState();
     render();
   }
 
@@ -874,7 +1395,9 @@
     if (!hostEl || !widgetContainer || widgetContainer.style.display === 'none') {
       expanded = true;
       showWidget();
-      if (!siteIsRisky && authUser) {
+      if (siteIsRisky && authUser) {
+        ensureFeedbackLoaded();
+      } else if (!siteIsRisky && authUser) {
         fetchReportRemaining(() => render());
       } else {
         render();
@@ -886,11 +1409,12 @@
 
   // ====== Init ======
   function init() {
-    chrome.storage.local.get(['adoraTheme', 'adoraLang', 'adoraUser', 'adoraWidgetPos'], (r) => {
+    chrome.storage.local.get(['adoraTheme', 'adoraLang', 'adoraUser', 'adoraWidgetPos', 'adoraSavings'], (r) => {
       curTheme = r.adoraTheme || 'light';
       curLang = r.adoraLang || 'en';
       authUser = r.adoraUser || null;
       widgetPos = r.adoraWidgetPos || null;
+      if (r.adoraSavings) savingsData = r.adoraSavings;
 
       // Check the current page
       try {
@@ -904,8 +1428,20 @@
 
           if (siteIsRisky) {
             console.log('[Adora] Risky site — showing widget');
+            currentSiteSavings = calculateSiteSavings(response);
+            if (currentSiteSavings > 0) {
+              recordSavings(currentSiteSavings);
+            }
             expanded = true;
             showWidget();
+            if (authUser) fetchFeedback(() => render());
+
+            if (currentSiteSavings > 0) {
+              setTimeout(() => {
+                const milestone = checkMilestone();
+                if (milestone) showMilestone(milestone);
+              }, 2000);
+            }
           }
         });
       } catch (e) {
@@ -930,7 +1466,10 @@
           siteResult = response;
           siteIsRisky = response && response.risky && response.score >= 0.6;
           expanded = true;
-          if (!siteIsRisky && authUser) {
+          if (siteIsRisky && authUser) {
+            resetFeedbackState();
+            fetchFeedback(() => showWidget());
+          } else if (!siteIsRisky && authUser) {
             fetchReportRemaining(() => showWidget());
           } else {
             showWidget();
@@ -947,7 +1486,12 @@
     let needRender = false;
     if (changes.adoraTheme) { curTheme = changes.adoraTheme.newValue || 'light'; needRender = true; }
     if (changes.adoraLang) { curLang = changes.adoraLang.newValue || 'en'; needRender = true; }
-    if (changes.adoraUser) { authUser = changes.adoraUser.newValue || null; needRender = true; }
+    if (changes.adoraUser) {
+      authUser = changes.adoraUser.newValue || null;
+      if (authUser && siteIsRisky) fetchFeedback(() => render());
+      else resetFeedbackState();
+      needRender = true;
+    }
     if (needRender && widgetContainer && widgetContainer.style.display !== 'none') render();
   });
 })();

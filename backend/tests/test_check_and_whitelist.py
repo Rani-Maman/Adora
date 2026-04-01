@@ -73,6 +73,7 @@ class TestCheckEndpoint:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchone.return_value = (
+            42,                 # risk_db_id
             "scam-shop.com",    # base_url
             0.85,               # risk_score
             ["countdown timer", "no business ID"],  # evidence
@@ -86,6 +87,7 @@ class TestCheckEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["risky"] is True
+        assert data["risk_db_id"] == 42
         assert data["score"] == 0.85
         assert "countdown timer" in data["evidence"]
 
