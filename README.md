@@ -38,35 +38,13 @@ extension/         Chrome extension (MV3) — React popup, vanilla JS service wo
 docs/              architecture and scraping pipeline notes
 ```
 
-## Running the backend
+## Stack
 
-Needs Python 3.11 and PostgreSQL 14 (schema in `backend/scripts/create_tables.sql`).
+Python 3.11 / FastAPI / PostgreSQL backend, Gemini 2.5 Flash for site analysis,
+Playwright for page scraping. The extension is Chrome Manifest V3 with a React popup
+and a vanilla JS service worker, built with Vite.
 
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Configuration comes from `backend/.env` — see `app/config.py` for the expected keys
-(DB credentials, `GEMINI_API_KEY`, etc.).
-
-Tests: `pytest tests/ -v`. Tests that need Playwright skip themselves when it isn't
-installed.
-
-## Building the extension
-
-```bash
-cd extension
-npm install
-npm run build
-```
-
-The build step generates `public/config.js` from `extension/.env` (`API_BASE`,
-`RISK_THRESHOLD`) and embeds the whitelist. Load `extension/dist/` as an unpacked
-extension via `chrome://extensions`.
-
-## Production
+## Deployment
 
 Everything runs on a single small cloud VM: the API as a systemd service behind nginx
 and a Cloudflare tunnel, with the scrape → analyze → price-match schedule driven by
