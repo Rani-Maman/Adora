@@ -13,7 +13,7 @@ actually acquire customers: the ads themselves.
 ## How it works
 
 1. **Scrape** — nightly cron jobs query the Ad Library's GraphQL endpoint for Hebrew
-   sale keywords (מבצע, מוגבל, הנחת...) and collect advertisers and their landing
+   sale keywords and collect advertisers and their landing
    URLs. Plain HTTP, no browser automation.
 2. **Analyze** — Playwright loads each new site and Gemini 2.5 Flash classifies it
    (dropship / legit / service / uncertain) with a 0.0–1.0 risk score and evidence.
