@@ -11,7 +11,7 @@ It talks to the existing FastAPI backend with a simple DB lookup. **No Gemini ru
 | Live UI on Vercel | Yes — [website-chi-murex-67.vercel.app](https://website-chi-murex-67.vercel.app/) |
 | Connected to production API | **Not yet** — `config.js` has an empty `ADORA_API_BASE` |
 | Custom domain (e.g. adoracheck.com) | Optional / separate step |
-| Legal pages | Draft only (`appeal@adora.placeholder`) |
+| Terms / Privacy / Sources pages | Not in repo yet — add before public launch |
 
 Until `ADORA_API_BASE` points at a public API that supports the endpoints below, the page loads but **Check does nothing useful**.
 
@@ -24,8 +24,6 @@ Until `ADORA_API_BASE` points at a public API that supports the endpoints below,
 | `styles.css` | Layout and styling |
 | `config.js` | Public API base URL (safe to commit; not a secret) |
 | `config.example.js` | Example config |
-| `sources.html` | Citations for banner industry stats |
-| `terms.html` / `privacy.html` | Legal drafts |
 | `vercel.json` | Vercel static settings (`cleanUrls`) |
 
 ## How it works (when API is connected)
@@ -108,8 +106,8 @@ The Vercel site can stay public. If you want only you + partner hitting the API:
 
 ## Before a real public launch
 
-- [ ] Replace `appeal@adora.placeholder` with a real contact email
-- [ ] Lawyer review of Terms / Privacy
+- [ ] Add Terms / Privacy / Sources pages (reviewed) and footer links
+- [ ] Real contact / appeal email
 - [ ] Point `ADORA_API_BASE` at a stable API hostname
 - [ ] Optional: attach custom domain in Vercel
 - [ ] Tighten `ADORA_WEB_ORIGINS` to the final site URL(s) only

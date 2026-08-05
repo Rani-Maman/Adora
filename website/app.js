@@ -34,11 +34,6 @@
       errorGeneric: "Something went wrong. Please try again.",
       disclaimer:
         "Adora doesn't guarantee 100% success; mistakes can always happen.",
-      appeal: "Shop flagged incorrectly?",
-      contact: "Contact us",
-      terms: "Terms",
-      privacy: "Privacy",
-      sources: "Sources",
       score: "Score",
       evidence: "Evidence",
     },
@@ -69,11 +64,6 @@
       errorGeneric: "משהו השתבש. נסה שוב.",
       disclaimer:
         "Adora לא מבטיחה 100% הצלחה; טעויות עלולות לקרות תמיד.",
-      appeal: "החנות סומנה בטעות?",
-      contact: "צרו קשר",
-      terms: "תקנון",
-      privacy: "פרטיות",
-      sources: "מקורות",
       score: "ציון",
       evidence: "סימנים",
     },
@@ -117,14 +107,6 @@
       tip.textContent = t("bbcSourceText");
     });
     el("footerDisclaimer").textContent = t("disclaimer");
-    el("footerAppeal").innerHTML =
-      t("appeal") +
-      ' <a href="mailto:appeal@adora.placeholder">' +
-      t("contact") +
-      "</a>";
-    el("linkTerms").textContent = t("terms");
-    el("linkPrivacy").textContent = t("privacy");
-    el("linkSources").textContent = t("sources");
   }
 
   function showResult(html, type) {
