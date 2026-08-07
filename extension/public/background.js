@@ -216,6 +216,11 @@ async function submitFeedback(data) {
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'GET_CAPABILITIES') {
+        // Safari has no chrome.identity — content scripts can't detect this themselves
+        sendResponse({ authSupported: !!(chrome.identity && chrome.identity.launchWebAuthFlow) });
+        return false;
+    }
     if (message.type === 'CHECK_URL') {
         checkUrl(message.url, sender.tab?.id).then(sendResponse);
         return true; // Keep channel open for async response

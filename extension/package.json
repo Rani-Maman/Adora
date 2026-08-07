@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "node build-config.js && node -e \"const{cpSync,rmSync}=require('fs');rmSync('dist',{recursive:true,force:true});cpSync('public','dist',{recursive:true});console.log('Copied public/ to dist/')\"",
     "build:config": "node build-config.js",
+    "build:safari": "node build-config.js && node build-safari.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
