@@ -1,9 +1,9 @@
 # Adora
 
 Adora flags dropshipping storefronts that target Israeli shoppers. It's a browser
-extension backed by a pipeline that scrapes the Meta Ad Library every night, analyzes
-the sites behind the ads, and maintains a risk database the extension queries as you
-browse.
+extension — Chrome and Safari, desktop and iPhone — backed by a pipeline that scrapes
+the Meta Ad Library every night, analyzes the sites behind the ads, and maintains a
+risk database the extension queries as you browse.
 
 A lot of "Israeli" shops advertised on Facebook and Instagram are AliExpress
 dropshippers with big markups, fake countdown timers and no real support. They churn
@@ -34,15 +34,18 @@ Architecture diagrams and the full pipeline write-up live in [docs/](docs/).
 backend/app/       FastAPI app — API routes, Gemini scoring, DB access
 backend/scripts/   cron jobs: scraper, batch analysis, price matching, summaries
 backend/data/      whitelist files
-extension/         Chrome extension (MV3) — React popup, vanilla JS service worker
-docs/              architecture and scraping pipeline notes
+extension/         Browser extension (MV3) — Chrome and Safari/iOS builds
+docs/              architecture, scraping pipeline, and iOS/Safari notes
 ```
 
 ## Stack
 
 Python 3.11 / FastAPI / PostgreSQL backend, Gemini 2.5 Flash for site analysis,
-Playwright for page scraping. The extension is Chrome Manifest V3 with a React popup
-and a vanilla JS service worker, built with Vite.
+Playwright for page scraping. The extension is Manifest V3 with a React popup and a
+vanilla JS service worker, built with Vite. The same source builds as a Safari Web
+Extension, wrapped as an iOS app so it runs in Safari on iPhone — capabilities that
+differ between the two browsers are resolved at runtime rather than forked into
+separate builds. See [docs/ios_safari_extension.md](docs/ios_safari_extension.md).
 
 ## Deployment
 
