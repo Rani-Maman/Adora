@@ -32,6 +32,10 @@ node_modules/
 *.swp
 *.swo
 
+# Agent skills (vendored, not project code)
+.agents/
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
