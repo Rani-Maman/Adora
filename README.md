@@ -35,7 +35,8 @@ backend/app/       FastAPI app — API routes, Gemini scoring, DB access
 backend/scripts/   cron jobs: scraper, batch analysis, price matching, summaries
 backend/data/      whitelist files
 extension/         Browser extension (MV3) — Chrome and Safari/iOS builds
-docs/              architecture, scraping pipeline, and iOS/Safari notes
+docs/              architecture, scraping pipeline, user system, iOS/Safari notes,
+                   project poster and presentation
 ```
 
 ## Stack
@@ -54,3 +55,11 @@ and a Cloudflare tunnel, with the scrape → analyze → price-match schedule dr
 cron. Scrape jobs are staggered an hour apart to stay under Meta's rate limits, and
 analysis runs are timed so Playwright and the scraper never compete for the VM's
 memory. Details in [docs/scraping_pipeline.md](docs/scraping_pipeline.md).
+
+## Project Materials
+
+Authentication and account design is documented in
+[docs/user_system_public.md](docs/user_system_public.md). The project poster
+([docs/Adora_Poster.jpg](docs/Adora_Poster.jpg)) and presentation
+([docs/AdoraPresentation.pptx](docs/AdoraPresentation.pptx)) summarise the product and
+architecture for review.
