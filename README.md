@@ -3,7 +3,7 @@
 <img width="128" height="128" alt="Adora Logo no background (3)" src="https://github.com/user-attachments/assets/d047bac2-c858-455c-9188-56acdbec97c0" />
 
 Adora flags dropshipping storefronts that target Israeli shoppers. It's a browser
-extension — Chrome and Safari, desktop and iPhone — backed by a pipeline that scrapes
+extension - Chrome and Safari, desktop and iPhone - backed by a pipeline that scrapes
 the Meta Ad Library every night, analyzes the sites behind the ads, and maintains a
 risk database the extension queries as you browse.
 
