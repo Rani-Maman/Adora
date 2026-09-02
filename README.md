@@ -1,6 +1,6 @@
 # Adora
 
-<img width="71" height="71" alt="Adora Logo no background (2)" src="https://github.com/user-attachments/assets/175ffaa0-acd2-45ca-a4d7-96e09a345690" />
+<img width="178" height="178" alt="Adora Logo no background (1)" src="https://github.com/user-attachments/assets/dbac0680-4e7e-4c3a-b7ae-228ede125d6f" />
 
 Adora flags dropshipping storefronts that target Israeli shoppers. It's a browser
 extension — Chrome and Safari, desktop and iPhone — backed by a pipeline that scrapes
