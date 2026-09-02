@@ -1,6 +1,6 @@
 # Adora
 
-<img width="178" height="178" alt="Adora Logo no background (1)" src="https://github.com/user-attachments/assets/dbac0680-4e7e-4c3a-b7ae-228ede125d6f" />
+<img width="128" height="128" alt="Adora Logo no background (3)" src="https://github.com/user-attachments/assets/d047bac2-c858-455c-9188-56acdbec97c0" />
 
 Adora flags dropshipping storefronts that target Israeli shoppers. It's a browser
 extension — Chrome and Safari, desktop and iPhone — backed by a pipeline that scrapes
@@ -14,14 +14,14 @@ actually acquire customers: the ads themselves.
 
 ## How it works
 
-1. **Scrape** — nightly cron jobs query the Ad Library's GraphQL endpoint for Hebrew
+1. **Scrape** - nightly cron jobs query the Ad Library's GraphQL endpoint for Hebrew
    sale keywords and collect advertisers and their landing
    URLs. Plain HTTP, no browser automation.
-2. **Analyze** — Playwright loads each new site and Gemini 2.5 Flash classifies it
+2. **Analyze** - Playwright loads each new site and Gemini 2.5 Flash classifies it
    (dropship / legit / service / uncertain) with a 0.0–1.0 risk score and evidence.
-3. **Price match** — products on risky sites are matched against AliExpress listings
+3. **Price match** - products on risky sites are matched against AliExpress listings
    to show the actual markup.
-4. **Serve** — anything scoring ≥ 0.6 lands in `risk_db`. The extension calls the
+4. **Serve** - anything scoring ≥ 0.6 lands in `risk_db`. The extension calls the
    FastAPI `/check` endpoint and shows a warning banner with the price comparison.
 
 The extension ships with a ~22K trusted-domain whitelist baked in at build time, so it
