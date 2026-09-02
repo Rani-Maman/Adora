@@ -46,7 +46,7 @@ docs/              architecture, scraping pipeline, user system, iOS/Safari note
 Python 3.11 / FastAPI / PostgreSQL backend, Gemini 2.5 Flash for site analysis,
 Playwright for page scraping. The extension is Manifest V3 with a React popup and a
 vanilla JS service worker, built with Vite. The same source builds as a Safari Web
-Extension, wrapped as an iOS app so it runs in Safari on iPhone — capabilities that
+Extension, wrapped as an iOS app so it runs in Safari on iPhone - capabilities that
 differ between the two browsers are resolved at runtime rather than forked into
 separate builds. See [docs/ios_safari_extension.md](docs/ios_safari_extension.md).
 
